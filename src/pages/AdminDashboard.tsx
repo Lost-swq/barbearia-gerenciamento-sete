@@ -235,31 +235,42 @@ const AdminDashboard = () => {
         }
       }
 
-      // Converte data de yyyy-mm-dd para dd/mm/yyyy antes de salvar
-      const dataParaSalvar = dataPagamento.includes('/')
-        ? dataPagamento
-        : (() => {
-            const [ano, mes, dia] = dataPagamento.split('-').map(Number);
-            return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
-          })();
+      // Extrai o dia da data de pagamento
+      const diaEscolhido = dataPagamento.includes('/') 
+        ? parseInt(dataPagamento.split('/')[0])
+        : parseInt(dataPagamento.split('-')[2]);
 
-      // Calcula o dataUltimoReset correto baseado na nova data de pagamento
-      const [dia, mes, ano] = dataParaSalvar.split('/').map(Number);
-      const novaDataPagamento = new Date(ano, mes - 1, dia);
       const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      novaDataPagamento.setHours(0, 0, 0, 0);
+      const anoAtual = hoje.getFullYear();
+      const mesAtual = hoje.getMonth(); // 0-11
+      const diaAtual = hoje.getDate();
+
+      // IMPORTANTE: A lógica aqui garante que o próximo reset seja sempre no MÊS SEGUINTE
+      // Se dia escolhido > dia atual: salvar 2 meses atrás (para garantir que avance 2x e chegue no próximo mês)
+      // Se dia escolhido <= dia atual: salvar 1 mês atrás (avança 1x e chega no próximo mês)
+      let mesesAtras = diaEscolhido > diaAtual ? 2 : 1;
       
-      // Se a data de pagamento é no futuro deste mês, o último reset foi no mês passado
-      // Se a data de pagamento já passou neste mês, o último reset é a data de pagamento deste mês
-      let dataUltimoReset: Date;
-      if (novaDataPagamento > hoje) {
-        // Data de pagamento é no futuro, último reset foi no mês passado
-        dataUltimoReset = new Date(ano, mes - 2, dia);
-      } else {
-        // Data de pagamento já passou, último reset foi neste mês
-        dataUltimoReset = new Date(ano, mes - 1, dia);
+      let mesPagamento = mesAtual - mesesAtras;
+      let anoPagamento = anoAtual;
+      
+      while (mesPagamento < 0) {
+        mesPagamento += 12;
+        anoPagamento -= 1;
       }
+
+      // Formato: dd/mm/yyyy (mês em formato 1-12)
+      const dataParaSalvar = `${diaEscolhido.toString().padStart(2, '0')}/${(mesPagamento + 1).toString().padStart(2, '0')}/${anoPagamento}`;
+
+      // Define dataUltimoReset como 1 mês antes da data de pagamento
+      let mesUltimoReset = mesPagamento - 1;
+      let anoUltimoReset = anoPagamento;
+      
+      if (mesUltimoReset < 0) {
+        mesUltimoReset = 11;
+        anoUltimoReset = anoPagamento - 1;
+      }
+      
+      const dataUltimoResetDate = new Date(anoUltimoReset, mesUltimoReset, diaEscolhido);
 
       await updateCliente(clienteSelecionado.id!, {
         nome,
@@ -267,7 +278,7 @@ const AdminDashboard = () => {
         cpf,
         plano,
         dataPagamento: dataParaSalvar,
-        dataUltimoReset: dataUltimoReset.toISOString()
+        dataUltimoReset: dataUltimoResetDate.toISOString()
       });
       
       toast.success("Cliente atualizado com sucesso!");
