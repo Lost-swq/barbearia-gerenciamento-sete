@@ -73,6 +73,9 @@ const Home = () => {
             Desenvolvido por <span className="font-semibold text-foreground">Reuel Vinicius</span>
           </p>
           <p className="text-xs text-muted-foreground/70 mt-1">
+            Para orçamento ou criação do seu site, entre em contato
+          </p>
+          <p className="text-xs text-muted-foreground/70 font-medium">
             83 99810-9547
           </p>
         </div>
