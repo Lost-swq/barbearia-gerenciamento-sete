@@ -67,6 +67,15 @@ const Home = () => {
           <p className="font-semibold text-primary">Copa do Brasil - R$ 54,90 (3 cortes)</p>
           <p className="font-semibold text-primary">UEFA Champions League - R$ 95,00 (3 cortes)</p>
         </div>
+
+        <div className="text-center pt-4 border-t border-border/50">
+          <p className="text-xs text-muted-foreground/70">
+            Desenvolvido por <span className="font-semibold text-foreground">Reuel Vinicius</span>
+          </p>
+          <p className="text-xs text-muted-foreground/70 mt-1">
+            83 99810-9547
+          </p>
+        </div>
       </div>
     </div>
   );
