@@ -132,6 +132,7 @@ const AdminDashboard = () => {
         plano,
         dataPagamento: dataParaSalvar,
         cortesRestantes: PLANOS[plano].cortes,
+        cortesBonus: 0,
         historicoCortes: [],
         historicoPagamentos: [primeiroPagamento],
         dataUltimoReset: agora.toISOString(),

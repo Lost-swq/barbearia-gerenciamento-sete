@@ -10,6 +10,7 @@ export interface Cliente {
   plano: PlanoType;
   dataPagamento: string;
   cortesRestantes: number;
+  cortesBonus: number;
   historicoCortes: CorteHistorico[];
   historicoPagamentos: PagamentoHistorico[];
   dataUltimoReset: string;
@@ -108,14 +109,17 @@ export const registrarCorte = async (clienteId: number): Promise<void> => {
   }
 
   const agora = new Date();
+  const usandoBonus = (cliente.cortesBonus || 0) > 0;
+  
   const novoCorte: CorteHistorico = {
     data: agora.toLocaleDateString('pt-BR'),
     hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    tipo: 'normal'
+    tipo: usandoBonus ? 'admin' : 'normal'
   };
 
   await db.clientes.update(clienteId, {
     cortesRestantes: cliente.cortesRestantes - 1,
+    cortesBonus: usandoBonus ? cliente.cortesBonus - 1 : (cliente.cortesBonus || 0),
     historicoCortes: [...cliente.historicoCortes, novoCorte]
   });
 };
@@ -124,16 +128,9 @@ export const adicionarCorte = async (clienteId: number): Promise<void> => {
   const cliente = await db.clientes.get(clienteId);
   if (!cliente) throw new Error('Cliente não encontrado');
 
-  const agora = new Date();
-  const novoCorte: CorteHistorico = {
-    data: agora.toLocaleDateString('pt-BR'),
-    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    tipo: 'admin'
-  };
-
   await db.clientes.update(clienteId, {
     cortesRestantes: cliente.cortesRestantes + 1,
-    historicoCortes: [...cliente.historicoCortes, novoCorte]
+    cortesBonus: (cliente.cortesBonus || 0) + 1
   });
 };
 
@@ -183,6 +180,7 @@ export const verificarEResetarCortes = async (): Promise<void> => {
       const planoInfo = PLANOS[cliente.plano];
       await db.clientes.update(cliente.id!, {
         cortesRestantes: planoInfo.cortes,
+        cortesBonus: 0,
         dataUltimoReset: hoje.toISOString()
       });
     }
