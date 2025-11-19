@@ -95,6 +95,15 @@ const AdminDashboard = () => {
     }
 
     try {
+      // Verifica se já existe cliente com esse CPF
+      const { getClienteByCpf } = await import("@/lib/database");
+      const clienteExistente = await getClienteByCpf(cpf);
+      
+      if (clienteExistente) {
+        toast.error("Já existe um cliente cadastrado com este CPF");
+        return;
+      }
+
       // Converte data de yyyy-mm-dd para dd/mm/yyyy antes de salvar
       const dataParaSalvar = dataPagamento.includes('/')
         ? dataPagamento
@@ -102,6 +111,17 @@ const AdminDashboard = () => {
             const [ano, mes, dia] = dataPagamento.split('-').map(Number);
             return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
           })();
+
+      const agora = new Date();
+      const valorPlano = PLANOS[plano].valor;
+      
+      // Cria o primeiro pagamento automaticamente
+      const primeiroPagamento = {
+        valor: valorPlano,
+        data: dataParaSalvar,
+        hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        confirmacao: `PAG-${Date.now()}`
+      };
 
       const novoCliente: Omit<Cliente, 'id'> = {
         nome,
@@ -111,13 +131,13 @@ const AdminDashboard = () => {
         dataPagamento: dataParaSalvar,
         cortesRestantes: PLANOS[plano].cortes,
         historicoCortes: [],
-        historicoPagamentos: [],
-        dataUltimoReset: new Date().toISOString(),
+        historicoPagamentos: [primeiroPagamento],
+        dataUltimoReset: agora.toISOString(),
         ativo: true
       };
 
       await addCliente(novoCliente);
-      toast.success("Cliente criado com sucesso!");
+      toast.success("Cliente criado! Primeiro pagamento registrado automaticamente.");
       
       // Reset form
       setNome("");
@@ -126,7 +146,7 @@ const AdminDashboard = () => {
       setPlano("COPA_BRASIL");
       setDataPagamento(() => {
         const hoje = new Date();
-        return hoje.toISOString().split('T')[0]; // yyyy-mm-dd
+        return hoje.toISOString().split('T')[0];
       });
       setPin("");
       setDialogOpen(false);
@@ -201,6 +221,17 @@ const AdminDashboard = () => {
     }
 
     try {
+      // Verifica se o CPF já existe em outro cliente (se foi alterado)
+      if (cpf !== clienteSelecionado.cpf) {
+        const { getClienteByCpf } = await import("@/lib/database");
+        const clienteExistente = await getClienteByCpf(cpf);
+        
+        if (clienteExistente && clienteExistente.id !== clienteSelecionado.id) {
+          toast.error("Já existe outro cliente cadastrado com este CPF");
+          return;
+        }
+      }
+
       // Converte data de yyyy-mm-dd para dd/mm/yyyy antes de salvar
       const dataParaSalvar = dataPagamento.includes('/')
         ? dataPagamento
@@ -215,7 +246,6 @@ const AdminDashboard = () => {
         cpf,
         plano,
         dataPagamento: dataParaSalvar
-        // Não reseta cortesRestantes ao editar, mantém o valor atual
       });
       
       toast.success("Cliente atualizado com sucesso!");

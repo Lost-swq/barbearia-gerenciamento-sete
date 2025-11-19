@@ -64,7 +64,7 @@ export const db = new BarberDatabase();
 
 // Funções auxiliares
 export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined> => {
-  return await db.clientes.where('cpf').equals(cpf).first();
+  return await db.clientes.where('cpf').equals(cpf).and(cliente => cliente.ativo).first();
 };
 
 export const getClienteByCredentials = async (
