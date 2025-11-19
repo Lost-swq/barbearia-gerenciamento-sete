@@ -162,7 +162,7 @@ export const calcularProximoReset = (dataPagamento: string): Date => {
   let proximoReset = new Date(dataBase);
   
   while (proximoReset <= hoje) {
-    proximoReset.setMonth(proximoReset.getMonth() + 1);
+    proximoReset.setDate(proximoReset.getDate() + 31);
   }
 
   return proximoReset;
