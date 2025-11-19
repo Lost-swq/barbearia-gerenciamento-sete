@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { LogOut, Scissors, Calendar, History, DollarSign, AlertTriangle } from "lucide-react";
+import { LogOut, Scissors, Calendar, History, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { db, Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes } from "@/lib/database";
 
@@ -173,11 +173,9 @@ const ClientDashboard = () => {
 
         {/* Mensagem de Timer Ativo */}
         {showTimerAlert && (
-          <Alert className="border-destructive bg-destructive/10">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-destructive">Aguarde um momento</AlertTitle>
-            <AlertDescription className="text-destructive/80">
-              Você já confirmou um corte recentemente. Tente novamente em alguns instantes.
+          <Alert variant="destructive">
+            <AlertDescription>
+              Você precisa esperar 1 minuto entre cada registro de corte.
             </AlertDescription>
           </Alert>
         )}

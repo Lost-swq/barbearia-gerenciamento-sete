@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, LogIn } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { getClienteByCredentials } from "@/lib/database";
 
@@ -122,7 +122,6 @@ const ClientLogin = () => {
               disabled={loading}
               className="w-full h-12 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
             >
-              <LogIn className="w-5 h-5 mr-2" />
               {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
