@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { LogOut, Scissors, Calendar, History, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { db, Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes } from "@/lib/database";
@@ -216,7 +217,14 @@ const ClientDashboard = () => {
             <div className="space-y-2">
               {[...cliente.historicoCortes].reverse().slice(0, 10).map((corte, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <span className="text-foreground">{corte.data}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-foreground">{corte.data}</span>
+                    {corte.tipo === 'admin' && (
+                      <Badge variant="secondary" className="text-xs bg-primary/20 text-primary border-primary/30">
+                        Bônus Admin
+                      </Badge>
+                    )}
+                  </div>
                   <span className="text-muted-foreground text-sm">{corte.hora}</span>
                 </div>
               ))}

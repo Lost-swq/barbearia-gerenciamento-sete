@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -654,9 +655,14 @@ const AdminDashboard = () => {
                           ) : (
                             <div className="space-y-1">
                               {[...cliente.historicoCortes].reverse().slice(0, 3).map((corte, idx) => (
-                                <p key={idx} className="text-xs text-foreground">
-                                  {corte.data} às {corte.hora}
-                                </p>
+                                <div key={idx} className="flex items-center gap-1 text-xs text-foreground">
+                                  <span>{corte.data} às {corte.hora}</span>
+                                  {corte.tipo === 'admin' && (
+                                    <Badge variant="secondary" className="text-[10px] bg-primary/20 text-primary border-primary/30 px-1 py-0">
+                                      Bônus
+                                    </Badge>
+                                  )}
+                                </div>
                               ))}
                             </div>
                           )}
