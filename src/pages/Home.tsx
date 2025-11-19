@@ -21,7 +21,7 @@ const Home = () => {
             <img
               src="/logo.png"
               alt="7BC Barber Club Logo"
-              className="w-32 h-32 object-contain"
+              className="w-20 h-20 object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-foreground">
