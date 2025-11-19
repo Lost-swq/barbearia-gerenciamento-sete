@@ -19,6 +19,7 @@ export interface Cliente {
 export interface CorteHistorico {
   data: string;
   hora: string;
+  tipo?: 'normal' | 'admin';
 }
 
 export interface PagamentoHistorico {
@@ -109,7 +110,8 @@ export const registrarCorte = async (clienteId: number): Promise<void> => {
   const agora = new Date();
   const novoCorte: CorteHistorico = {
     data: agora.toLocaleDateString('pt-BR'),
-    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    tipo: 'normal'
   };
 
   await db.clientes.update(clienteId, {
@@ -122,8 +124,16 @@ export const adicionarCorte = async (clienteId: number): Promise<void> => {
   const cliente = await db.clientes.get(clienteId);
   if (!cliente) throw new Error('Cliente não encontrado');
 
+  const agora = new Date();
+  const novoCorte: CorteHistorico = {
+    data: agora.toLocaleDateString('pt-BR'),
+    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    tipo: 'admin'
+  };
+
   await db.clientes.update(clienteId, {
-    cortesRestantes: cliente.cortesRestantes + 1
+    cortesRestantes: cliente.cortesRestantes + 1,
+    historicoCortes: [...cliente.historicoCortes, novoCorte]
   });
 };
 
