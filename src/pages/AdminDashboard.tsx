@@ -243,12 +243,31 @@ const AdminDashboard = () => {
             return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
           })();
 
+      // Calcula o dataUltimoReset correto baseado na nova data de pagamento
+      const [dia, mes, ano] = dataParaSalvar.split('/').map(Number);
+      const novaDataPagamento = new Date(ano, mes - 1, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      novaDataPagamento.setHours(0, 0, 0, 0);
+      
+      // Se a data de pagamento é no futuro deste mês, o último reset foi no mês passado
+      // Se a data de pagamento já passou neste mês, o último reset é a data de pagamento deste mês
+      let dataUltimoReset: Date;
+      if (novaDataPagamento > hoje) {
+        // Data de pagamento é no futuro, último reset foi no mês passado
+        dataUltimoReset = new Date(ano, mes - 2, dia);
+      } else {
+        // Data de pagamento já passou, último reset foi neste mês
+        dataUltimoReset = new Date(ano, mes - 1, dia);
+      }
+
       await updateCliente(clienteSelecionado.id!, {
         nome,
         sobrenome,
         cpf,
         plano,
-        dataPagamento: dataParaSalvar
+        dataPagamento: dataParaSalvar,
+        dataUltimoReset: dataUltimoReset.toISOString()
       });
       
       toast.success("Cliente atualizado com sucesso!");
