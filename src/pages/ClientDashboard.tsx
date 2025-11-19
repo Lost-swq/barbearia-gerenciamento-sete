@@ -189,9 +189,9 @@ const ClientDashboard = () => {
           className="w-full h-16 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <img
-            src="/cabeleleiro.jpg"
-            alt="Logo Barbearia"
-            className="w-8 h-8 mr-2 rounded-full object-cover"
+            src="/logo.png"
+            alt="7BC Logo"
+            className="w-10 h-10 mr-2 object-contain"
           />
           {corteTimer ? "Aguarde..." : "Registrar Corte"}
         </Button>
