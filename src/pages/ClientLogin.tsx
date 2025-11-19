@@ -74,7 +74,7 @@ const ClientLogin = () => {
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
             <div className="w-20 h-20 rounded-full bg-card border-2 border-primary/20 shadow-lg flex items-center justify-center p-2">
-              <img src="/logo-7bc.png" alt="7BC Barber Club Logo" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="7BC Barber Club Logo" className="w-full h-full object-contain" />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-foreground">Login Cliente</h1>
