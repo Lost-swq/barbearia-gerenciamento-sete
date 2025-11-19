@@ -188,11 +188,7 @@ const ClientDashboard = () => {
           disabled={cliente.cortesRestantes <= 0 || corteTimer}
           className="w-full h-16 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <img
-            src="/logo.png"
-            alt="7BC Logo"
-            className="w-10 h-10 mr-2 object-contain"
-          />
+          <Scissors className="w-5 h-5 mr-2" />
           {corteTimer ? "Aguarde..." : "Registrar Corte"}
         </Button>
 
