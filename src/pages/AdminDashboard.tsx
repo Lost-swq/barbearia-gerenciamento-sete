@@ -125,6 +125,18 @@ const AdminDashboard = () => {
         confirmacao: `PAG-${Date.now()}`
       };
 
+      // Calcula o dataUltimoReset baseado em períodos de 31 dias
+      const [dia, mes, ano] = dataParaSalvar.split('/').map(Number);
+      const dataPagamentoDate = new Date(ano, mes - 1, dia);
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      dataPagamentoDate.setHours(0, 0, 0, 0);
+      
+      let dataUltimoReset = new Date(dataPagamentoDate);
+      while (dataUltimoReset > hoje) {
+        dataUltimoReset.setDate(dataUltimoReset.getDate() - 31);
+      }
+
       const novoCliente: Omit<Cliente, 'id'> = {
         nome,
         sobrenome,
@@ -135,7 +147,7 @@ const AdminDashboard = () => {
         cortesBonus: 0,
         historicoCortes: [],
         historicoPagamentos: [primeiroPagamento],
-        dataUltimoReset: agora.toISOString(),
+        dataUltimoReset: dataUltimoReset.toISOString(),
         ativo: true
       };
 
