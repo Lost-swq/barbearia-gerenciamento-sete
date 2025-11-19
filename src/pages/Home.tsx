@@ -17,15 +17,15 @@ const Home = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-6">
             <img
-              src="/cabeleleiro.jpg"
-              alt="Logo Barbearia"
-              className="w-20 h-20 rounded-full object-cover shadow-lg"
+              src="/logo.png"
+              alt="7BC Barber Club Logo"
+              className="w-32 h-32 object-contain"
             />
           </div>
           <h1 className="text-4xl font-bold text-foreground">
-            Sete Barber Club
+            7BC Barber Club
           </h1>
           <p className="text-muted-foreground text-lg">
             Bem-vindo ao seu clube de barbearia
@@ -60,10 +60,10 @@ const Home = () => {
           </Button>
         </Card>
 
-        <div className="text-center text-sm text-muted-foreground">
-          <p>Planos disponíveis:</p>
-          <p className="font-semibold text-primary">Copa do Brasil - R$ 54,90</p>
-          <p className="font-semibold text-primary">UEFA Champions League - R$ 95,00</p>
+        <div className="text-center text-sm text-muted-foreground space-y-1">
+          <p className="text-foreground font-medium">Planos disponíveis:</p>
+          <p className="font-semibold text-primary">Copa do Brasil - R$ 54,90 (3 cortes)</p>
+          <p className="font-semibold text-primary">UEFA Champions League - R$ 95,00 (3 cortes)</p>
         </div>
       </div>
     </div>
