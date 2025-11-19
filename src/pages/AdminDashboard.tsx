@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2 } from "lucide-react";
+import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { 
   getAllClientes, 
@@ -20,7 +20,8 @@ import {
   calcularProximoReset,
   verificarEResetarCortes,
   updateCliente,
-  deleteCliente
+  deleteCliente,
+  adicionarCorte
 } from "@/lib/database";
 
 const AdminDashboard = () => {
@@ -275,6 +276,18 @@ const AdminDashboard = () => {
       await loadClientes();
     } catch (error) {
       toast.error("Erro ao excluir cliente");
+    }
+  };
+
+  const handleAdicionarCorte = async (cliente: Cliente) => {
+    if (!cliente.id) return;
+    
+    try {
+      await adicionarCorte(cliente.id);
+      toast.success("Corte adicionado com sucesso!");
+      await loadClientes();
+    } catch (error) {
+      toast.error("Erro ao adicionar corte");
     }
   };
 
@@ -548,6 +561,15 @@ const AdminDashboard = () => {
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleAdicionarCorte(cliente)}
+                            className="border-primary text-foreground hover:bg-primary/10"
+                          >
+                            <Plus className="w-4 h-4 mr-1" />
+                            Adicionar Corte
+                          </Button>
                           <Dialog open={pagamentoDialogOpen && clienteSelecionado?.id === cliente.id}
                                 onOpenChange={(open) => {
                                   setPagamentoDialogOpen(open);
