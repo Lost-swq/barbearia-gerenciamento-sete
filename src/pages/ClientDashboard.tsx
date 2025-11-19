@@ -1,0 +1,266 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { LogOut, Scissors, Calendar, History, DollarSign, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { db, Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes } from "@/lib/database";
+
+const ClientDashboard = () => {
+  const navigate = useNavigate();
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [corteTimer, setCorteTimer] = useState(false);
+  const [showTimerAlert, setShowTimerAlert] = useState(false);
+
+  const loadCliente = async () => {
+    const clienteId = sessionStorage.getItem("clienteId");
+
+    if (!clienteId) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      await verificarEResetarCortes();
+      const clienteData = await db.clientes.get(parseInt(clienteId));
+
+      if (!clienteData) {
+        toast.error("Cliente não encontrado");
+        navigate("/login");
+        return;
+      }
+
+      setCliente(clienteData);
+    } catch (error) {
+      toast.error("Erro ao carregar dados");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCliente();
+  }, []);
+
+  useEffect(() => {
+    if (corteTimer) {
+      const timer = setTimeout(() => {
+        setCorteTimer(false);
+      }, 60000); // 1 minuto
+
+      return () => clearTimeout(timer);
+    }
+  }, [corteTimer]);
+
+  const handleLogout = () => {
+    sessionStorage.removeItem("clienteId");
+    sessionStorage.removeItem("clienteNome");
+    toast.success("Logout realizado");
+    navigate("/");
+  };
+
+  const handleRegistrarCorte = async () => {
+    if (!cliente || !cliente.id) return;
+
+    if (corteTimer) {
+      setShowTimerAlert(true);
+      setTimeout(() => setShowTimerAlert(false), 3000);
+      return;
+    }
+
+    // Verifica se há pelo menos um pagamento registrado no mês atual
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+
+    const temPagamentoMesAtual = cliente.historicoPagamentos.some(pagamento => {
+      const [dia, mes, ano] = pagamento.data.split('/').map(Number);
+      return mes - 1 === mesAtual && ano === anoAtual;
+    });
+
+    if (!temPagamentoMesAtual) {
+      toast.error("Você precisa ter um pagamento registrado no mês atual para registrar cortes.");
+      return;
+    }
+
+    if (cliente.cortesRestantes <= 0) {
+      const proximoReset = calcularProximoReset(cliente.dataPagamento);
+      toast.error(`Sem cortes disponíveis. Próximo reset em ${proximoReset.toLocaleDateString('pt-BR')}`);
+      return;
+    }
+
+    try {
+      await registrarCorte(cliente.id);
+      toast.success("Corte registrado com sucesso!");
+      setCorteTimer(true);
+      await loadCliente();
+    } catch (error) {
+      toast.error("Erro ao registrar corte");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!cliente) return null;
+
+  const planoInfo = PLANOS[cliente.plano];
+  const proximoReset = calcularProximoReset(cliente.dataPagamento);
+  const cortesTotais = planoInfo.cortes;
+
+  return (
+    <div className="min-h-screen bg-background p-4 pb-20">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Olá, {cliente.nome}!
+            </h1>
+            <p className="text-muted-foreground">Seu painel de controle</p>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-foreground hover:text-destructive"
+          >
+            <LogOut className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Plano Card */}
+        <Card className="p-6 border-2 border-primary bg-card shadow-green">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Seu Plano</p>
+                <h2 className="text-2xl font-bold text-primary">{planoInfo.nome}</h2>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Valor</p>
+                <p className="text-2xl font-bold text-foreground">
+                  R$ {planoInfo.valor.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px bg-border"></div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-foreground">Cortes Restantes</p>
+                <p className="text-3xl font-bold text-primary">
+                  {cliente.cortesRestantes} <span className="text-lg text-muted-foreground">de {cortesTotais}</span>
+                </p>
+              </div>
+
+              <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+                <div
+                  className="bg-primary h-full transition-all duration-500 rounded-full"
+                  style={{ width: `${(cliente.cortesRestantes / cortesTotais) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Mensagem de Timer Ativo */}
+        {showTimerAlert && (
+          <Alert className="border-destructive bg-destructive/10">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="text-destructive">Aguarde um momento</AlertTitle>
+            <AlertDescription className="text-destructive/80">
+              Você já confirmou um corte recentemente. Tente novamente em alguns instantes.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Botão Registrar Corte */}
+        <Button
+          onClick={handleRegistrarCorte}
+          disabled={cliente.cortesRestantes <= 0 || corteTimer}
+          className="w-full h-16 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <img
+            src="/cabeleleiro.jpg"
+            alt="Logo Barbearia"
+            className="w-8 h-8 mr-2 rounded-full object-cover"
+          />
+          {corteTimer ? "Aguarde..." : "Registrar Corte"}
+        </Button>
+
+        {/* Próximo Reset */}
+        <Card className="p-4 border-border bg-card">
+          <div className="flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-primary" />
+            <div>
+              <p className="text-sm text-muted-foreground">Próximo Reset</p>
+              <p className="text-foreground font-semibold">
+                {proximoReset.toLocaleDateString('pt-BR')}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Histórico de Cortes */}
+        <Card className="p-6 border-border bg-card">
+          <div className="flex items-center gap-2 mb-4">
+            <History className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Histórico de Cortes</h3>
+          </div>
+
+          {cliente.historicoCortes.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum corte registrado ainda</p>
+          ) : (
+            <div className="space-y-2">
+              {[...cliente.historicoCortes].reverse().slice(0, 10).map((corte, index) => (
+                <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <span className="text-foreground">{corte.data}</span>
+                  <span className="text-muted-foreground text-sm">{corte.hora}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Histórico de Pagamentos */}
+        <Card className="p-6 border-border bg-card">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Histórico de Pagamentos</h3>
+          </div>
+
+          {cliente.historicoPagamentos.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhum pagamento registrado ainda</p>
+          ) : (
+            <div className="space-y-2">
+              {[...cliente.historicoPagamentos].reverse().slice(0, 10).map((pagamento, index) => (
+                <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div>
+                    <p className="text-foreground font-semibold">
+                      R$ {pagamento.valor.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{pagamento.confirmacao}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-foreground text-sm">{pagamento.data}</p>
+                    <p className="text-muted-foreground text-xs">{pagamento.hora}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default ClientDashboard;
