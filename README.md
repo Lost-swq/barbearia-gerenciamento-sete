@@ -1,4 +1,4 @@
- Welcome to your Lovable project
+ antan pronoWelcome to your Lovable project
 
 ## Project info
 
