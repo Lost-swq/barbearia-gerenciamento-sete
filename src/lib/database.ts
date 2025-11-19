@@ -158,9 +158,15 @@ export const calcularProximoReset = (dataPagamento: string): Date => {
   const [dia, mes, ano] = dataPagamento.split('/').map(Number);
   const dataBase = new Date(ano, mes - 1, dia);
   const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  dataBase.setHours(0, 0, 0, 0);
 
   let proximoReset = new Date(dataBase);
   
+  // Sempre adiciona 31 dias pelo menos uma vez
+  proximoReset.setDate(proximoReset.getDate() + 31);
+  
+  // Se ainda estiver no passado, continua adicionando 31 dias
   while (proximoReset <= hoje) {
     proximoReset.setDate(proximoReset.getDate() + 31);
   }
