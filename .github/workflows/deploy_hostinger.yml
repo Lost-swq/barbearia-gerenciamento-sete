@@ -1,0 +1,55 @@
+name: CI/CD - Deploy para Hostinger
+
+on:
+  push:
+    branches:
+      - main   # Sua branch principal
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+
+    steps:
+      # 1. Checkout do repositório
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      # 2. Configurar Node.js
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'   # Versão recomendada pelo Lovable
+
+      # 3. Instalar dependências
+      - name: Instalar dependências
+        run: npm install
+
+      # 4. Rodar o build (gera a pasta dist/)
+      - name: Rodar build
+        run: npm run build
+
+      # 5. (Opcional) Mostrar o conteúdo da pasta dist para debug
+      - name: Listar arquivos do build
+        run: ls -R dist/
+
+      # 6. Deploy via FTP para Hostinger
+      - name: Deploy via FTP para Hostinger
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftp
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          dangerous-clean-slate: true
+
+      # 7. Limpar cache automaticamente (cache bust)
+      - name: Purge CDN Cache
+        run: curl -s https://setebarberclub.com.br/?purge=${{ github.run_id }}
