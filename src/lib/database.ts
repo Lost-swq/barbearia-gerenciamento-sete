@@ -118,6 +118,15 @@ export const registrarCorte = async (clienteId: number): Promise<void> => {
   });
 };
 
+export const adicionarCorte = async (clienteId: number): Promise<void> => {
+  const cliente = await db.clientes.get(clienteId);
+  if (!cliente) throw new Error('Cliente não encontrado');
+
+  await db.clientes.update(clienteId, {
+    cortesRestantes: cliente.cortesRestantes + 1
+  });
+};
+
 export const registrarPagamento = async (
   clienteId: number,
   valor: number
