@@ -106,43 +106,15 @@ const AdminDashboard = () => {
         return;
       }
 
-      // Converte data de yyyy-mm-dd para dd/mm/yyyy antes de salvar
-      const dataParaSalvar = dataPagamento.includes('/')
-        ? dataPagamento
-        : (() => {
-            const [ano, mes, dia] = dataPagamento.split('-').map(Number);
-            return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
-          })();
-
-      const agora = new Date();
+      // Data já está em formato yyyy-mm-dd correto para o banco
       const valorPlano = PLANOS[plano].valor;
-      
-      // Cria o primeiro pagamento automaticamente
-      const primeiroPagamento = {
-        valor: valorPlano,
-        data: dataParaSalvar,
-        hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        confirmacao: `PAG-${Date.now()}`
-      };
-
-      // Calcula o dataUltimoReset baseado em períodos de 31 dias
-      const [dia, mes, ano] = dataParaSalvar.split('/').map(Number);
-      const dataPagamentoDate = new Date(ano, mes - 1, dia);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      dataPagamentoDate.setHours(0, 0, 0, 0);
-      
-      let dataUltimoReset = new Date(dataPagamentoDate);
-      while (dataUltimoReset > hoje) {
-        dataUltimoReset.setDate(dataUltimoReset.getDate() - 31);
-      }
 
       const clienteId = await addCliente({
         nome,
         sobrenome,
         cpf,
         plano,
-        data_pagamento: dataParaSalvar,
+        data_pagamento: dataPagamento, // Formato yyyy-mm-dd para o banco
         pin_criacao: pin,
         cortes_restantes: PLANOS[plano].cortes,
         cortes_bonus: 0
@@ -245,33 +217,14 @@ const AdminDashboard = () => {
         }
       }
 
-      // Converte data de yyyy-mm-dd para dd/mm/yyyy antes de salvar
-      const dataParaSalvar = dataPagamento.includes('/')
-        ? dataPagamento
-        : (() => {
-            const [ano, mes, dia] = dataPagamento.split('-').map(Number);
-            return `${dia.toString().padStart(2, '0')}/${mes.toString().padStart(2, '0')}/${ano}`;
-          })();
-
-      // Calcula o dataUltimoReset correto baseado na nova data de pagamento (31 dias)
-      const [dia, mes, ano] = dataParaSalvar.split('/').map(Number);
-      const novaDataPagamento = new Date(ano, mes - 1, dia);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      novaDataPagamento.setHours(0, 0, 0, 0);
-      
-      // Encontra o último reset subtraindo períodos de 31 dias
-      let dataUltimoReset = new Date(novaDataPagamento);
-      while (dataUltimoReset > hoje) {
-        dataUltimoReset.setDate(dataUltimoReset.getDate() - 31);
-      }
+      // Data já está em formato yyyy-mm-dd correto para o banco
 
       await updateCliente(clienteSelecionado.id, {
         nome,
         sobrenome,
         cpf,
         plano,
-        data_pagamento: dataParaSalvar
+        data_pagamento: dataPagamento
       });
       
       toast.success("Cliente atualizado com sucesso!");
