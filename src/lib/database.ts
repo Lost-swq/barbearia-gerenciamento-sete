@@ -76,7 +76,7 @@ export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined>
     .select('*')
     .eq('cpf', cpf)
     .eq('ativo', true)
-    .single();
+    .maybeSingle();
   
   if (error) return undefined;
   return data as Cliente;
