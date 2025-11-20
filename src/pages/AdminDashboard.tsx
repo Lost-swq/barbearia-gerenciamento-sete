@@ -120,8 +120,8 @@ const AdminDashboard = () => {
         cortes_bonus: 0
       });
 
-      // Registrar o primeiro pagamento
-      await registrarPagamento(clienteId, valorPlano);
+      // Registrar o primeiro pagamento com a data escolhida
+      await registrarPagamento(clienteId, valorPlano, dataPagamento);
       toast.success("Cliente criado! Primeiro pagamento registrado automaticamente.");
       
       // Reset form
