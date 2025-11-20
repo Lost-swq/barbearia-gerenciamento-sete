@@ -23,7 +23,9 @@ import {
   verificarEResetarCortes,
   updateCliente,
   deleteCliente,
-  adicionarCorte
+  adicionarCorte,
+  getHistoricoPagamentos,
+  getHistoricoCortes
 } from "@/lib/database";
 
 const AdminDashboard = () => {
@@ -56,7 +58,6 @@ const AdminDashboard = () => {
       setClientes(data);
       
       // Carregar histórico de pagamentos e cortes para cada cliente
-      const { getHistoricoPagamentos, getHistoricoCortes } = await import("@/lib/database");
       const pagamentosMap: Record<string, any[]> = {};
       const cortesMap: Record<string, any[]> = {};
       
