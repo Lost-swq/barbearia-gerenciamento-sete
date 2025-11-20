@@ -173,6 +173,29 @@ export const deleteCliente = async (id: string): Promise<void> => {
   if (error) throw error;
 };
 
+// Excluir todos os clientes e seus dados
+export const deleteAllClientes = async (): Promise<void> => {
+  // Deletar todos os históricos de cortes
+  await supabase
+    .from('cortes_historico')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
+  
+  // Deletar todos os históricos de pagamentos
+  await supabase
+    .from('pagamentos_historico')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
+  
+  // Deletar todos os clientes
+  const { error } = await supabase
+    .from('clientes')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
+  
+  if (error) throw error;
+};
+
 export const registrarCorte = async (clienteId: string): Promise<void> => {
   const { data: cliente, error: clienteError } = await supabase
     .from('clientes')
