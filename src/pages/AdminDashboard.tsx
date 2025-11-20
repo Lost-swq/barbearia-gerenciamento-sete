@@ -79,12 +79,25 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const isAdmin = sessionStorage.getItem("adminAuthenticated");
-    if (!isAdmin) {
-      navigate("/admin-login");
-      return;
-    }
-    loadClientes();
+    const checkAuth = async () => {
+      const isAdmin = sessionStorage.getItem("adminAuthenticated");
+      if (!isAdmin) {
+        navigate("/admin-login");
+        return;
+      }
+
+      // Verificar autenticação Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        sessionStorage.removeItem("adminAuthenticated");
+        navigate("/admin-login");
+        return;
+      }
+
+      loadClientes();
+    };
+
+    checkAuth();
 
     // Configurar realtime para cortes
     const channel = supabase
@@ -108,7 +121,8 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     sessionStorage.removeItem("adminAuthenticated");
     toast.success("Logout realizado");
     navigate("/");
