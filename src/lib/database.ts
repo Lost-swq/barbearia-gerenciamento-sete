@@ -1,33 +1,39 @@
-import Dexie, { Table } from 'dexie';
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-export type PlanoType = 'COPA_BRASIL' | 'UEFA_CL';
+export type PlanoType = Database['public']['Enums']['plano_type'];
 
 export interface Cliente {
-  id?: number;
+  id: string;
   nome: string;
   sobrenome: string;
   cpf: string;
   plano: PlanoType;
-  dataPagamento: string;
-  cortesRestantes: number;
-  cortesBonus: number;
-  historicoCortes: CorteHistorico[];
-  historicoPagamentos: PagamentoHistorico[];
-  dataUltimoReset: string;
+  data_pagamento: string;
+  pin_criacao: string;
+  cortes_restantes: number;
+  cortes_bonus: number;
+  data_ultimo_reset: string | null;
   ativo: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CorteHistorico {
+  id: string;
+  cliente_id: string;
   data: string;
-  hora: string;
-  tipo?: 'normal' | 'admin';
+  tipo: string | null;
+  created_at: string;
 }
 
 export interface PagamentoHistorico {
+  id: string;
+  cliente_id: string;
   valor: number;
   data: string;
-  hora: string;
   confirmacao: string;
+  created_at: string;
 }
 
 export const PLANOS = {
@@ -51,22 +57,29 @@ export const ADMIN_CREDENTIALS = {
 
 export const CLIENT_CREATION_PIN = '97531';
 
-class BarberDatabase extends Dexie {
-  clientes!: Table<Cliente>;
-
-  constructor() {
-    super('BarberClubDB');
-    this.version(1).stores({
-      clientes: '++id, nome, sobrenome, cpf, ativo'
-    });
-  }
-}
-
-export const db = new BarberDatabase();
-
 // Funções auxiliares
+export const getClienteById = async (id: string): Promise<Cliente | undefined> => {
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('id', id)
+    .eq('ativo', true)
+    .single();
+  
+  if (error) return undefined;
+  return data as Cliente;
+};
+
 export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined> => {
-  return await db.clientes.where('cpf').equals(cpf).and(cliente => cliente.ativo).first();
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('cpf', cpf)
+    .eq('ativo', true)
+    .single();
+  
+  if (error) return undefined;
+  return data as Cliente;
 };
 
 export const getClienteByCredentials = async (
@@ -74,121 +87,250 @@ export const getClienteByCredentials = async (
   sobrenome: string,
   cpf: string
 ): Promise<Cliente | undefined> => {
-  return await db.clientes
-    .where('cpf').equals(cpf)
-    .and(cliente =>
-      cliente.nome.toLowerCase() === nome.toLowerCase() &&
-      cliente.sobrenome.toLowerCase() === sobrenome.toLowerCase() &&
-      cliente.ativo
-    )
-    .first();
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('cpf', cpf)
+    .eq('ativo', true)
+    .ilike('nome', nome)
+    .ilike('sobrenome', sobrenome)
+    .single();
+  
+  if (error) return undefined;
+  return data as Cliente;
 };
 
 export const getAllClientes = async (): Promise<Cliente[]> => {
-  return await db.clientes.filter(cliente => cliente.ativo === true).toArray();
+  const { data, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('ativo', true)
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data as Cliente[];
 };
 
-export const addCliente = async (cliente: Omit<Cliente, 'id'>): Promise<number> => {
-  return await db.clientes.add(cliente);
+export const addCliente = async (cliente: {
+  nome: string;
+  sobrenome: string;
+  cpf: string;
+  plano: PlanoType;
+  data_pagamento: string;
+  pin_criacao: string;
+  cortes_restantes?: number;
+  cortes_bonus?: number;
+}): Promise<string> => {
+  const { data, error } = await supabase
+    .from('clientes')
+    .insert({
+      nome: cliente.nome,
+      sobrenome: cliente.sobrenome,
+      cpf: cliente.cpf,
+      plano: cliente.plano,
+      data_pagamento: cliente.data_pagamento,
+      pin_criacao: cliente.pin_criacao,
+      cortes_restantes: cliente.cortes_restantes ?? 3,
+      cortes_bonus: cliente.cortes_bonus ?? 0,
+      ativo: true
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data.id;
 };
 
-export const updateCliente = async (id: number, updates: Partial<Cliente>): Promise<number> => {
-  return await db.clientes.update(id, updates);
+export const updateCliente = async (id: string, updates: Partial<Cliente>): Promise<void> => {
+  const { error } = await supabase
+    .from('clientes')
+    .update(updates)
+    .eq('id', id);
+  
+  if (error) throw error;
 };
 
-export const deleteCliente = async (id: number): Promise<void> => {
-  await db.clientes.update(id, { ativo: false });
+export const deleteCliente = async (id: string): Promise<void> => {
+  const { error } = await supabase
+    .from('clientes')
+    .update({ ativo: false })
+    .eq('id', id);
+  
+  if (error) throw error;
 };
 
-export const registrarCorte = async (clienteId: number): Promise<void> => {
-  const cliente = await db.clientes.get(clienteId);
-  if (!cliente) throw new Error('Cliente não encontrado');
+export const registrarCorte = async (clienteId: string): Promise<void> => {
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('id', clienteId)
+    .single();
 
-  if (cliente.cortesRestantes <= 0) {
+  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
+
+  if (cliente.cortes_restantes <= 0) {
     throw new Error('Sem cortes disponíveis');
   }
 
-  const agora = new Date();
-  const usandoBonus = (cliente.cortesBonus || 0) > 0;
+  const usandoBonus = (cliente.cortes_bonus || 0) > 0;
   
-  const novoCorte: CorteHistorico = {
-    data: agora.toLocaleDateString('pt-BR'),
-    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    tipo: usandoBonus ? 'admin' : 'normal'
-  };
+  // Inserir no histórico de cortes
+  const { error: corteError } = await supabase
+    .from('cortes_historico')
+    .insert({
+      cliente_id: clienteId,
+      tipo: usandoBonus ? 'admin' : 'normal'
+    });
 
-  await db.clientes.update(clienteId, {
-    cortesRestantes: cliente.cortesRestantes - 1,
-    cortesBonus: usandoBonus ? cliente.cortesBonus - 1 : (cliente.cortesBonus || 0),
-    historicoCortes: [...cliente.historicoCortes, novoCorte]
-  });
+  if (corteError) throw corteError;
+
+  // Atualizar cortes restantes
+  const { error: updateError } = await supabase
+    .from('clientes')
+    .update({
+      cortes_restantes: cliente.cortes_restantes - 1,
+      cortes_bonus: usandoBonus ? cliente.cortes_bonus - 1 : (cliente.cortes_bonus || 0)
+    })
+    .eq('id', clienteId);
+
+  if (updateError) throw updateError;
 };
 
-export const adicionarCorte = async (clienteId: number): Promise<void> => {
-  const cliente = await db.clientes.get(clienteId);
-  if (!cliente) throw new Error('Cliente não encontrado');
+export const adicionarCorte = async (clienteId: string): Promise<void> => {
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('id', clienteId)
+    .single();
 
-  await db.clientes.update(clienteId, {
-    cortesRestantes: cliente.cortesRestantes + 1,
-    cortesBonus: (cliente.cortesBonus || 0) + 1
-  });
+  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
+
+  const { error } = await supabase
+    .from('clientes')
+    .update({
+      cortes_restantes: cliente.cortes_restantes + 1,
+      cortes_bonus: (cliente.cortes_bonus || 0) + 1
+    })
+    .eq('id', clienteId);
+
+  if (error) throw error;
 };
 
 export const registrarPagamento = async (
-  clienteId: number,
+  clienteId: string,
   valor: number
 ): Promise<void> => {
-  const cliente = await db.clientes.get(clienteId);
-  if (!cliente) throw new Error('Cliente não encontrado');
+  const { data: cliente, error: clienteError } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('id', clienteId)
+    .single();
+
+  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
 
   const agora = new Date();
-  const novoPagamento: PagamentoHistorico = {
-    valor,
-    data: agora.toLocaleDateString('pt-BR'),
-    hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-    confirmacao: `PAG-${Date.now()}`
-  };
+  const novaDataPagamento = new Date(agora);
+  novaDataPagamento.setMonth(agora.getMonth() + 1);
 
-  await db.clientes.update(clienteId, {
-    historicoPagamentos: [...cliente.historicoPagamentos, novoPagamento]
-  });
+  const codigoConfirmacao = gerarCodigoConfirmacao();
+
+  // Inserir no histórico de pagamentos
+  const { error: pagamentoError } = await supabase
+    .from('pagamentos_historico')
+    .insert({
+      cliente_id: clienteId,
+      valor,
+      confirmacao: codigoConfirmacao
+    });
+
+  if (pagamentoError) throw pagamentoError;
+
+  const novosCortesRestantes = cliente.cortes_restantes + PLANOS[cliente.plano].cortes;
+
+  // Atualizar cliente
+  const { error: updateError } = await supabase
+    .from('clientes')
+    .update({
+      data_pagamento: novaDataPagamento.toISOString().split('T')[0],
+      cortes_restantes: novosCortesRestantes
+    })
+    .eq('id', clienteId);
+
+  if (updateError) throw updateError;
+};
+
+const gerarCodigoConfirmacao = (): string => {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
 export const calcularProximoReset = (dataPagamento: string): Date => {
-  const [dia, mes, ano] = dataPagamento.split('/').map(Number);
-  const dataBase = new Date(ano, mes - 1, dia);
+  const dataBase = new Date(dataPagamento);
   const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  dataBase.setHours(0, 0, 0, 0);
-
-  let proximoReset = new Date(dataBase);
   
-  // Sempre adiciona 31 dias pelo menos uma vez
-  proximoReset.setDate(proximoReset.getDate() + 31);
+  const proximoReset = new Date(dataBase);
+  proximoReset.setMonth(hoje.getMonth() + 1);
+  proximoReset.setFullYear(hoje.getFullYear());
   
-  // Se ainda estiver no passado, continua adicionando 31 dias
-  while (proximoReset <= hoje) {
-    proximoReset.setDate(proximoReset.getDate() + 31);
+  if (proximoReset < hoje) {
+    proximoReset.setMonth(proximoReset.getMonth() + 1);
   }
-
+  
   return proximoReset;
 };
 
 export const verificarEResetarCortes = async (): Promise<void> => {
-  const clientes = await db.clientes.filter(cliente => cliente.ativo).toArray();
+  const { data: clientes, error } = await supabase
+    .from('clientes')
+    .select('*')
+    .eq('ativo', true);
+
+  if (error || !clientes) return;
+  
   const hoje = new Date();
-
+  
   for (const cliente of clientes) {
-    const proximoReset = calcularProximoReset(cliente.dataPagamento);
-    const dataUltimoReset = new Date(cliente.dataUltimoReset);
-
-    if (hoje >= proximoReset && hoje > dataUltimoReset) {
-      const planoInfo = PLANOS[cliente.plano];
-      await db.clientes.update(cliente.id!, {
-        cortesRestantes: planoInfo.cortes,
-        cortesBonus: 0,
-        dataUltimoReset: hoje.toISOString()
-      });
+    const dataPagamento = new Date(cliente.data_pagamento);
+    const dia = dataPagamento.getDate();
+    
+    const ultimoReset = cliente.data_ultimo_reset 
+      ? new Date(cliente.data_ultimo_reset)
+      : null;
+    
+    const dataResetEsperado = new Date(hoje.getFullYear(), hoje.getMonth(), dia);
+    
+    if (hoje >= dataResetEsperado && (!ultimoReset || ultimoReset < dataResetEsperado)) {
+      await supabase
+        .from('clientes')
+        .update({
+          cortes_restantes: PLANOS[cliente.plano].cortes,
+          cortes_bonus: 0,
+          data_ultimo_reset: dataResetEsperado.toISOString().split('T')[0]
+        })
+        .eq('id', cliente.id);
     }
   }
+};
+
+// Função para buscar histórico de cortes de um cliente
+export const getHistoricoCortes = async (clienteId: string): Promise<CorteHistorico[]> => {
+  const { data, error } = await supabase
+    .from('cortes_historico')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .order('data', { ascending: false });
+  
+  if (error) throw error;
+  return data as CorteHistorico[];
+};
+
+// Função para buscar histórico de pagamentos de um cliente
+export const getHistoricoPagamentos = async (clienteId: string): Promise<PagamentoHistorico[]> => {
+  const { data, error } = await supabase
+    .from('pagamentos_historico')
+    .select('*')
+    .eq('cliente_id', clienteId)
+    .order('data', { ascending: false });
+  
+  if (error) throw error;
+  return data as PagamentoHistorico[];
 };

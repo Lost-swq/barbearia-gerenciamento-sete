@@ -137,21 +137,19 @@ const AdminDashboard = () => {
         dataUltimoReset.setDate(dataUltimoReset.getDate() - 31);
       }
 
-      const novoCliente: Omit<Cliente, 'id'> = {
+      const clienteId = await addCliente({
         nome,
         sobrenome,
         cpf,
         plano,
-        dataPagamento: dataParaSalvar,
-        cortesRestantes: PLANOS[plano].cortes,
-        cortesBonus: 0,
-        historicoCortes: [],
-        historicoPagamentos: [primeiroPagamento],
-        dataUltimoReset: dataUltimoReset.toISOString(),
-        ativo: true
-      };
+        data_pagamento: dataParaSalvar,
+        pin_criacao: pin,
+        cortes_restantes: PLANOS[plano].cortes,
+        cortes_bonus: 0
+      });
 
-      await addCliente(novoCliente);
+      // Registrar o primeiro pagamento
+      await registrarPagamento(clienteId, valorPlano);
       toast.success("Cliente criado! Primeiro pagamento registrado automaticamente.");
       
       // Reset form
@@ -186,8 +184,8 @@ const AdminDashboard = () => {
       return;
     }
 
-    try {
-      await registrarPagamento(clienteSelecionado.id!, valor);
+    try{
+      await registrarPagamento(clienteSelecionado.id, valor);
       toast.success("Pagamento registrado com sucesso!");
       setValorPagamento("");
       setPagamentoDialogOpen(false);
@@ -205,10 +203,10 @@ const AdminDashboard = () => {
     setCpf(cliente.cpf);
     setPlano(cliente.plano);
     // Converte data de dd/mm/yyyy para yyyy-mm-dd se necessário
-    const dataFormatada = cliente.dataPagamento.includes('-')
-      ? cliente.dataPagamento
+    const dataFormatada = cliente.data_pagamento.includes('-')
+      ? cliente.data_pagamento
       : (() => {
-          const [dia, mes, ano] = cliente.dataPagamento.split('/').map(Number);
+          const [dia, mes, ano] = cliente.data_pagamento.split('/').map(Number);
           return `${ano}-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
         })();
     setDataPagamento(dataFormatada);
@@ -268,13 +266,12 @@ const AdminDashboard = () => {
         dataUltimoReset.setDate(dataUltimoReset.getDate() - 31);
       }
 
-      await updateCliente(clienteSelecionado.id!, {
+      await updateCliente(clienteSelecionado.id, {
         nome,
         sobrenome,
         cpf,
         plano,
-        dataPagamento: dataParaSalvar,
-        dataUltimoReset: dataUltimoReset.toISOString()
+        data_pagamento: dataParaSalvar
       });
       
       toast.success("Cliente atualizado com sucesso!");
@@ -538,7 +535,7 @@ const AdminDashboard = () => {
             <div className="grid grid-cols-1 gap-4">
               {clientes.map((cliente) => {
                 const planoInfo = PLANOS[cliente.plano];
-                const proximoReset = calcularProximoReset(cliente.dataPagamento);
+                const proximoReset = calcularProximoReset(cliente.data_pagamento);
                 
                 return (
                   <Card key={cliente.id} className="p-6 border-2 border-border bg-card hover:border-primary transition-colors">
@@ -655,14 +652,14 @@ const AdminDashboard = () => {
                         
                         <div>
                           <p className="text-sm text-muted-foreground">Data Pagamento</p>
-                          <p className="font-semibold text-foreground">{cliente.dataPagamento}</p>
+                          <p className="font-semibold text-foreground">{new Date(cliente.data_pagamento).toLocaleDateString('pt-BR')}</p>
                         </div>
                         
                         <div>
                           <p className="text-sm text-muted-foreground">Cortes Restantes</p>
                           <p className="font-semibold text-foreground flex items-center gap-1">
                             <Scissors className="w-4 h-4 text-primary" />
-                            {cliente.cortesRestantes} de {planoInfo.cortes}
+                            {cliente.cortes_restantes} de {planoInfo.cortes}
                           </p>
                         </div>
 
@@ -676,38 +673,13 @@ const AdminDashboard = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
                         <div>
-                          <p className="text-sm font-semibold text-foreground mb-2">Últimos Cortes</p>
-                          {cliente.historicoCortes.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">Nenhum corte ainda</p>
-                          ) : (
-                            <div className="space-y-1">
-                              {[...cliente.historicoCortes].reverse().slice(0, 3).map((corte, idx) => (
-                                <div key={idx} className="flex items-center gap-1 text-xs text-foreground">
-                                  <span>{corte.data} às {corte.hora}</span>
-                                  {corte.tipo === 'admin' && (
-                                    <Badge variant="secondary" className="text-[10px] bg-primary/20 text-primary border-primary/30 px-1 py-0">
-                                      Bônus
-                                    </Badge>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          <p className="text-sm font-semibold text-foreground mb-2">Cortes Totais</p>
+                          <p className="text-xs text-muted-foreground">Consulte o histórico completo no painel</p>
                         </div>
 
                         <div>
-                          <p className="text-sm font-semibold text-foreground mb-2">Últimos Pagamentos</p>
-                          {cliente.historicoPagamentos.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">Nenhum pagamento ainda</p>
-                          ) : (
-                            <div className="space-y-1">
-                              {[...cliente.historicoPagamentos].reverse().slice(0, 3).map((pag, idx) => (
-                                <p key={idx} className="text-xs text-foreground">
-                                  R$ {pag.valor.toFixed(2)} - {pag.data}
-                                </p>
-                              ))}
-                            </div>
-                          )}
+                          <p className="text-sm font-semibold text-foreground mb-2">Pagamentos Totais</p>
+                          <p className="text-xs text-muted-foreground">Consulte o histórico completo no painel</p>
                         </div>
                       </div>
                     </div>
