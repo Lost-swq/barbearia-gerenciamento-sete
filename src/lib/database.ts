@@ -129,6 +129,7 @@ export const addCliente = async (cliente: {
       cpf: cliente.cpf,
       plano: cliente.plano,
       data_pagamento: cliente.data_pagamento,
+      data_ultimo_reset: cliente.data_pagamento, // Define o mesmo dia como último reset
       pin_criacao: cliente.pin_criacao,
       cortes_restantes: cliente.cortes_restantes ?? 3,
       cortes_bonus: cliente.cortes_bonus ?? 0,
