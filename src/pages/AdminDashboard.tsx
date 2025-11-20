@@ -23,10 +23,7 @@ import {
   verificarEResetarCortes,
   updateCliente,
   deleteCliente,
-  adicionarCorte,
-  getHistoricoPagamentos,
-  getHistoricoCortes,
-  getClienteByCpf
+  adicionarCorte
 } from "@/lib/database";
 
 const AdminDashboard = () => {
@@ -59,6 +56,7 @@ const AdminDashboard = () => {
       setClientes(data);
       
       // Carregar histórico de pagamentos e cortes para cada cliente
+      const { getHistoricoPagamentos, getHistoricoCortes } = await import("@/lib/database");
       const pagamentosMap: Record<string, any[]> = {};
       const cortesMap: Record<string, any[]> = {};
       
@@ -79,25 +77,12 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const isAdmin = sessionStorage.getItem("adminAuthenticated");
-      if (!isAdmin) {
-        navigate("/admin-login");
-        return;
-      }
-
-      // Verificar autenticação Supabase
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        sessionStorage.removeItem("adminAuthenticated");
-        navigate("/admin-login");
-        return;
-      }
-
-      loadClientes();
-    };
-
-    checkAuth();
+    const isAdmin = sessionStorage.getItem("adminAuthenticated");
+    if (!isAdmin) {
+      navigate("/admin-login");
+      return;
+    }
+    loadClientes();
 
     // Configurar realtime para cortes
     const channel = supabase
@@ -121,8 +106,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     sessionStorage.removeItem("adminAuthenticated");
     toast.success("Logout realizado");
     navigate("/");
@@ -153,6 +137,7 @@ const AdminDashboard = () => {
 
     try {
       // Verifica se já existe cliente com esse CPF
+      const { getClienteByCpf } = await import("@/lib/database");
       const clienteExistente = await getClienteByCpf(cpf);
       
       if (clienteExistente) {

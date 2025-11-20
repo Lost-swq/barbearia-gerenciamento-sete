@@ -129,80 +129,14 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          cliente_id: string | null
-          cpf: string | null
-          created_at: string | null
-          id: string
-          nome: string
-          sobrenome: string
-          updated_at: string | null
-        }
-        Insert: {
-          cliente_id?: string | null
-          cpf?: string | null
-          created_at?: string | null
-          id: string
-          nome: string
-          sobrenome: string
-          updated_at?: string | null
-        }
-        Update: {
-          cliente_id?: string | null
-          cpf?: string | null
-          created_at?: string | null
-          id?: string
-          nome?: string
-          sobrenome?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "admin" | "customer"
       plano_type: "COPA_BRASIL" | "UEFA_CL"
     }
     CompositeTypes: {
@@ -331,7 +265,6 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "customer"],
       plano_type: ["COPA_BRASIL", "UEFA_CL"],
     },
   },

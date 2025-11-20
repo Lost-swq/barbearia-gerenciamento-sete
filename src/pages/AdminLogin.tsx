@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { ADMIN_CREDENTIALS } from "@/lib/database";
-import { supabase } from "@/integrations/supabase/client";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -26,65 +25,21 @@ const AdminLogin = () => {
 
     setLoading(true);
 
-    try {
-      // Validar credenciais localmente
+    // Simular delay de validação
+    setTimeout(() => {
       if (
-        nome.toLowerCase() !== ADMIN_CREDENTIALS.nome.toLowerCase() ||
-        sobrenome.toLowerCase() !== ADMIN_CREDENTIALS.sobrenome.toLowerCase() ||
-        pin !== ADMIN_CREDENTIALS.pin
+        nome.toLowerCase() === ADMIN_CREDENTIALS.nome.toLowerCase() &&
+        sobrenome.toLowerCase() === ADMIN_CREDENTIALS.sobrenome.toLowerCase() &&
+        pin === ADMIN_CREDENTIALS.pin
       ) {
+        sessionStorage.setItem("adminAuthenticated", "true");
+        toast.success("Bem-vindo, Admin!");
+        navigate("/admin");
+      } else {
         toast.error("Acesso negado. Use o login de administrador correto.");
-        setLoading(false);
-        return;
       }
-
-      // Login com Supabase usando credenciais fixas de admin
-      const adminEmail = "admin@barbershop.local";
-      const adminPassword = `${ADMIN_CREDENTIALS.nome}${ADMIN_CREDENTIALS.sobrenome}${ADMIN_CREDENTIALS.pin}`;
-      
-      // Tentar fazer login
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminPassword,
-      });
-
-      if (signInError) {
-        // Se falhar, tentar criar a conta
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: adminEmail,
-          password: adminPassword,
-          options: {
-            data: {
-              nome: ADMIN_CREDENTIALS.nome,
-              sobrenome: ADMIN_CREDENTIALS.sobrenome,
-              is_admin: true
-            }
-          }
-        });
-
-        if (signUpError) {
-          toast.error("Erro ao autenticar admin");
-          console.error(signUpError);
-          setLoading(false);
-          return;
-        }
-
-        // Fazer login após criar conta
-        await supabase.auth.signInWithPassword({
-          email: adminEmail,
-          password: adminPassword,
-        });
-      }
-
-      sessionStorage.setItem("adminAuthenticated", "true");
-      toast.success("Bem-vindo, Admin!");
-      navigate("/admin");
-    } catch (error) {
-      console.error("Erro no login:", error);
-      toast.error("Erro ao fazer login");
-    } finally {
       setLoading(false);
-    }
+    }, 500);
   };
 
   return (
