@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   getAllClientes, 
   addCliente, 
@@ -84,7 +85,6 @@ const AdminDashboard = () => {
     loadClientes();
 
     // Configurar realtime para cortes
-    const { supabase } = require("@/integrations/supabase/client");
     const channel = supabase
       .channel('admin_cortes_updates')
       .on(
