@@ -228,9 +228,6 @@ export const registrarPagamento = async (
 
   if (clienteError || !cliente) throw new Error('Cliente não encontrado');
 
-  const agora = new Date();
-  const hoje = agora.toISOString().split('T')[0]; // formato yyyy-mm-dd
-
   const codigoConfirmacao = gerarCodigoConfirmacao();
 
   // Inserir no histórico de pagamentos
@@ -243,22 +240,6 @@ export const registrarPagamento = async (
     });
 
   if (pagamentoError) throw pagamentoError;
-
-  const novosCortesRestantes = PLANOS[cliente.plano].cortes;
-
-  // Atualizar cliente - define data_pagamento e data_ultimo_reset como hoje
-  // O próximo reset será 31 dias depois
-  const { error: updateError } = await supabase
-    .from('clientes')
-    .update({
-      data_pagamento: hoje,
-      data_ultimo_reset: hoje,
-      cortes_restantes: novosCortesRestantes,
-      cortes_bonus: 0
-    })
-    .eq('id', clienteId);
-
-  if (updateError) throw updateError;
 };
 
 const gerarCodigoConfirmacao = (): string => {
