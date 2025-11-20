@@ -14,7 +14,121 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          ativo: boolean
+          cortes_bonus: number
+          cortes_restantes: number
+          cpf: string
+          created_at: string
+          data_pagamento: string
+          data_ultimo_reset: string | null
+          id: string
+          nome: string
+          pin_criacao: string
+          plano: Database["public"]["Enums"]["plano_type"]
+          sobrenome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cortes_bonus?: number
+          cortes_restantes?: number
+          cpf: string
+          created_at?: string
+          data_pagamento: string
+          data_ultimo_reset?: string | null
+          id?: string
+          nome: string
+          pin_criacao: string
+          plano: Database["public"]["Enums"]["plano_type"]
+          sobrenome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cortes_bonus?: number
+          cortes_restantes?: number
+          cpf?: string
+          created_at?: string
+          data_pagamento?: string
+          data_ultimo_reset?: string | null
+          id?: string
+          nome?: string
+          pin_criacao?: string
+          plano?: Database["public"]["Enums"]["plano_type"]
+          sobrenome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cortes_historico: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          data: string
+          id: string
+          tipo: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          data?: string
+          id?: string
+          tipo?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          data?: string
+          id?: string
+          tipo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cortes_historico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagamentos_historico: {
+        Row: {
+          cliente_id: string
+          confirmacao: string
+          created_at: string
+          data: string
+          id: string
+          valor: number
+        }
+        Insert: {
+          cliente_id: string
+          confirmacao: string
+          created_at?: string
+          data?: string
+          id?: string
+          valor: number
+        }
+        Update: {
+          cliente_id?: string
+          confirmacao?: string
+          created_at?: string
+          data?: string
+          id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_historico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +137,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      plano_type: "COPA_BRASIL" | "UEFA_CL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +264,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      plano_type: ["COPA_BRASIL", "UEFA_CL"],
+    },
   },
 } as const
