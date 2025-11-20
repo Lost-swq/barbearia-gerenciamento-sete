@@ -34,6 +34,7 @@ const AdminDashboard = () => {
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [pagamentosPorCliente, setPagamentosPorCliente] = useState<Record<string, any[]>>({});
+  const [cortesPorCliente, setCortesPorCliente] = useState<Record<string, any[]>>({});
 
   // Form states
   const [nome, setNome] = useState("");
@@ -53,16 +54,20 @@ const AdminDashboard = () => {
       const data = await getAllClientes();
       setClientes(data);
       
-      // Carregar histórico de pagamentos para cada cliente
-      const { getHistoricoPagamentos } = await import("@/lib/database");
+      // Carregar histórico de pagamentos e cortes para cada cliente
+      const { getHistoricoPagamentos, getHistoricoCortes } = await import("@/lib/database");
       const pagamentosMap: Record<string, any[]> = {};
+      const cortesMap: Record<string, any[]> = {};
       
       for (const cliente of data) {
         const pagamentos = await getHistoricoPagamentos(cliente.id);
+        const cortes = await getHistoricoCortes(cliente.id);
         pagamentosMap[cliente.id] = pagamentos;
+        cortesMap[cliente.id] = cortes;
       }
       
       setPagamentosPorCliente(pagamentosMap);
+      setCortesPorCliente(cortesMap);
     } catch (error) {
       toast.error("Erro ao carregar clientes");
     } finally {
@@ -77,6 +82,28 @@ const AdminDashboard = () => {
       return;
     }
     loadClientes();
+
+    // Configurar realtime para cortes
+    const { supabase } = require("@/integrations/supabase/client");
+    const channel = supabase
+      .channel('admin_cortes_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'cortes_historico'
+        },
+        () => {
+          // Recarregar dados quando um novo corte for registrado
+          loadClientes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -639,7 +666,20 @@ const AdminDashboard = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
                         <div>
                           <p className="text-sm font-semibold text-foreground mb-2">Cortes Totais</p>
-                          <p className="text-xs text-muted-foreground">Consulte o histórico completo no painel</p>
+                          {cortesPorCliente[cliente.id]?.length > 0 ? (
+                            <div className="space-y-1">
+                              {cortesPorCliente[cliente.id].slice(0, 3).map((corte, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <span className="text-foreground">{new Date(corte.data).toLocaleString('pt-BR')}</span>
+                                  {corte.tipo === 'admin' && (
+                                    <span className="text-primary ml-1">(Bônus)</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Nenhum corte registrado</p>
+                          )}
                         </div>
 
                         <div>
