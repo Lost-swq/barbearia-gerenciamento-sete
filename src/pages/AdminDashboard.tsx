@@ -23,7 +23,8 @@ import {
   verificarEResetarCortes,
   updateCliente,
   deleteCliente,
-  adicionarCorte
+  adicionarCorte,
+  deleteAllClientes
 } from "@/lib/database";
 
 const AdminDashboard = () => {
@@ -333,6 +334,16 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteAllClients = async () => {
+    try {
+      await deleteAllClientes();
+      toast.success("Todos os clientes foram excluídos com sucesso!");
+      await loadClientes();
+    } catch (error) {
+      toast.error("Erro ao excluir todos os clientes");
+    }
+  };
+
   const handleAdicionarCorte = async (cliente: Cliente) => {
     if (!cliente.id) return;
     
@@ -363,6 +374,31 @@ const AdminDashboard = () => {
             <p className="text-muted-foreground">Gerencie seus clientes</p>
           </div>
           <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="text-destructive-foreground">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir Todos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-card border-2 border-border">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-foreground">Tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-muted-foreground">
+                    Esta ação não pode ser desfeita. Todos os clientes e seus históricos serão permanentemente excluídos do banco de dados.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-border text-foreground">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAllClients}
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  >
+                    Excluir Todos
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
