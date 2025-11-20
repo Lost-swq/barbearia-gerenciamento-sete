@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Scissors, Calendar, History, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { db, Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes } from "@/lib/database";
+import { Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes, getClienteById, getHistoricoCortes, getHistoricoPagamentos } from "@/lib/database";
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -14,6 +14,8 @@ const ClientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [corteTimer, setCorteTimer] = useState(false);
   const [showTimerAlert, setShowTimerAlert] = useState(false);
+  const [historicoCortes, setHistoricoCortes] = useState<any[]>([]);
+  const [historicoPagamentos, setHistoricoPagamentos] = useState<any[]>([]);
 
   const loadCliente = async () => {
     const clienteId = sessionStorage.getItem("clienteId");
@@ -25,7 +27,7 @@ const ClientDashboard = () => {
 
     try {
       await verificarEResetarCortes();
-      const clienteData = await db.clientes.get(parseInt(clienteId));
+      const clienteData = await getClienteById(clienteId);
 
       if (!clienteData) {
         toast.error("Cliente não encontrado");
@@ -34,6 +36,12 @@ const ClientDashboard = () => {
       }
 
       setCliente(clienteData);
+      
+      // Carregar históricos
+      const cortes = await getHistoricoCortes(clienteId);
+      const pagamentos = await getHistoricoPagamentos(clienteId);
+      setHistoricoCortes(cortes);
+      setHistoricoPagamentos(pagamentos);
     } catch (error) {
       toast.error("Erro ao carregar dados");
     } finally {
@@ -63,7 +71,7 @@ const ClientDashboard = () => {
   };
 
   const handleRegistrarCorte = async () => {
-    if (!cliente || !cliente.id) return;
+    if (!cliente) return;
 
     if (corteTimer) {
       setShowTimerAlert(true);
@@ -76,9 +84,9 @@ const ClientDashboard = () => {
     const mesAtual = hoje.getMonth();
     const anoAtual = hoje.getFullYear();
 
-    const temPagamentoMesAtual = cliente.historicoPagamentos.some(pagamento => {
-      const [dia, mes, ano] = pagamento.data.split('/').map(Number);
-      return mes - 1 === mesAtual && ano === anoAtual;
+    const temPagamentoMesAtual = historicoPagamentos.some(pagamento => {
+      const dataPag = new Date(pagamento.data);
+      return dataPag.getMonth() === mesAtual && dataPag.getFullYear() === anoAtual;
     });
 
     if (!temPagamentoMesAtual) {
@@ -86,8 +94,8 @@ const ClientDashboard = () => {
       return;
     }
 
-    if (cliente.cortesRestantes <= 0) {
-      const proximoReset = calcularProximoReset(cliente.dataPagamento);
+    if (cliente.cortes_restantes <= 0) {
+      const proximoReset = calcularProximoReset(cliente.data_pagamento);
       toast.error(`Sem cortes disponíveis. Próximo reset em ${proximoReset.toLocaleDateString('pt-BR')}`);
       return;
     }
@@ -113,7 +121,7 @@ const ClientDashboard = () => {
   if (!cliente) return null;
 
   const planoInfo = PLANOS[cliente.plano];
-  const proximoReset = calcularProximoReset(cliente.dataPagamento);
+  const proximoReset = calcularProximoReset(cliente.data_pagamento);
   const cortesTotais = planoInfo.cortes;
 
   return (
@@ -158,14 +166,14 @@ const ClientDashboard = () => {
               <div className="flex items-center justify-between">
                 <p className="text-foreground">Cortes Restantes</p>
                 <p className="text-3xl font-bold text-primary">
-                  {cliente.cortesRestantes} <span className="text-lg text-muted-foreground">de {cortesTotais}</span>
+                  {cliente.cortes_restantes} <span className="text-lg text-muted-foreground">de {cortesTotais}</span>
                 </p>
               </div>
 
               <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
                 <div
                   className="bg-primary h-full transition-all duration-500 rounded-full"
-                  style={{ width: `${(cliente.cortesRestantes / cortesTotais) * 100}%` }}
+                  style={{ width: `${(cliente.cortes_restantes / cortesTotais) * 100}%` }}
                 ></div>
               </div>
             </div>
@@ -184,7 +192,7 @@ const ClientDashboard = () => {
         {/* Botão Registrar Corte */}
         <Button
           onClick={handleRegistrarCorte}
-          disabled={cliente.cortesRestantes <= 0 || corteTimer}
+          disabled={cliente.cortes_restantes <= 0 || corteTimer}
           className="w-full h-16 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Scissors className="w-5 h-5 mr-2" />
@@ -211,21 +219,20 @@ const ClientDashboard = () => {
             <h3 className="text-lg font-semibold text-foreground">Histórico de Cortes</h3>
           </div>
 
-          {cliente.historicoCortes.length === 0 ? (
+          {historicoCortes.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum corte registrado ainda</p>
           ) : (
             <div className="space-y-2">
-              {[...cliente.historicoCortes].reverse().slice(0, 10).map((corte, index) => (
+              {historicoCortes.slice(0, 10).map((corte, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-foreground">{corte.data}</span>
+                    <span className="text-foreground">{new Date(corte.data).toLocaleString('pt-BR')}</span>
                     {corte.tipo === 'admin' && (
                       <Badge variant="secondary" className="text-xs bg-primary/20 text-primary border-primary/30">
-                        Bônus Admin
+                        Bônus
                       </Badge>
                     )}
                   </div>
-                  <span className="text-muted-foreground text-sm">{corte.hora}</span>
                 </div>
               ))}
             </div>
@@ -239,11 +246,11 @@ const ClientDashboard = () => {
             <h3 className="text-lg font-semibold text-foreground">Histórico de Pagamentos</h3>
           </div>
 
-          {cliente.historicoPagamentos.length === 0 ? (
+          {historicoPagamentos.length === 0 ? (
             <p className="text-muted-foreground text-sm">Nenhum pagamento registrado ainda</p>
           ) : (
             <div className="space-y-2">
-              {[...cliente.historicoPagamentos].reverse().slice(0, 10).map((pagamento, index) => (
+              {historicoPagamentos.slice(0, 10).map((pagamento, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div>
                     <p className="text-foreground font-semibold">
