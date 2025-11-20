@@ -282,24 +282,27 @@ export const verificarEResetarCortes = async (): Promise<void> => {
   if (error || !clientes) return;
   
   const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
   
   for (const cliente of clientes) {
-    const dataPagamento = new Date(cliente.data_pagamento);
-    const dia = dataPagamento.getDate();
-    
-    const ultimoReset = cliente.data_ultimo_reset 
+    // Determina a data base para calcular o próximo reset
+    const dataBase = cliente.data_ultimo_reset 
       ? new Date(cliente.data_ultimo_reset)
-      : null;
+      : new Date(cliente.data_pagamento);
     
-    const dataResetEsperado = new Date(hoje.getFullYear(), hoje.getMonth(), dia);
+    // Calcula a data do próximo reset (31 dias após a data base)
+    const proximoReset = new Date(dataBase);
+    proximoReset.setDate(proximoReset.getDate() + 31);
+    proximoReset.setHours(0, 0, 0, 0);
     
-    if (hoje >= dataResetEsperado && (!ultimoReset || ultimoReset < dataResetEsperado)) {
+    // Se hoje >= próximo reset, fazer o reset
+    if (hoje >= proximoReset) {
       await supabase
         .from('clientes')
         .update({
           cortes_restantes: PLANOS[cliente.plano].cortes,
           cortes_bonus: 0,
-          data_ultimo_reset: dataResetEsperado.toISOString().split('T')[0]
+          data_ultimo_reset: hoje.toISOString().split('T')[0]
         })
         .eq('id', cliente.id);
     }
