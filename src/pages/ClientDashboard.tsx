@@ -252,16 +252,12 @@ const ClientDashboard = () => {
             <div className="space-y-2">
               {historicoPagamentos.slice(0, 10).map((pagamento, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <div>
-                    <p className="text-foreground font-semibold">
-                      R$ {pagamento.valor.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{pagamento.confirmacao}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-foreground text-sm">{pagamento.data}</p>
-                    <p className="text-muted-foreground text-xs">{pagamento.hora}</p>
-                  </div>
+                  <p className="text-foreground font-semibold">
+                    R$ {pagamento.valor.toFixed(2)}
+                  </p>
+                  <p className="text-foreground text-sm">
+                    {new Date(pagamento.data).toLocaleString('pt-BR')}
+                  </p>
                 </div>
               ))}
             </div>
