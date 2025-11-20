@@ -56,20 +56,50 @@ const AdminDashboard = () => {
       const data = await getAllClientes();
       setClientes(data);
       
-      // Carregar histórico de pagamentos e cortes para cada cliente
-      const { getHistoricoPagamentos, getHistoricoCortes } = await import("@/lib/database");
-      const pagamentosMap: Record<string, any[]> = {};
-      const cortesMap: Record<string, any[]> = {};
+      // Otimização: Buscar todos os históricos de uma vez usando IDs dos clientes
+      const clienteIds = data.map(c => c.id);
       
-      for (const cliente of data) {
-        const pagamentos = await getHistoricoPagamentos(cliente.id);
-        const cortes = await getHistoricoCortes(cliente.id);
-        pagamentosMap[cliente.id] = pagamentos;
-        cortesMap[cliente.id] = cortes;
+      if (clienteIds.length > 0) {
+        // Buscar todos os pagamentos de uma vez (1 query em vez de N)
+        const { data: todosPagamentos } = await supabase
+          .from('pagamentos_historico')
+          .select('*')
+          .in('cliente_id', clienteIds)
+          .order('data', { ascending: false });
+        
+        // Buscar todos os cortes de uma vez (1 query em vez de N)
+        const { data: todosCortes } = await supabase
+          .from('cortes_historico')
+          .select('*')
+          .in('cliente_id', clienteIds)
+          .order('data', { ascending: false });
+        
+        // Organizar por cliente usando reduce para melhor performance
+        const pagamentosMap: Record<string, any[]> = {};
+        const cortesMap: Record<string, any[]> = {};
+        
+        // Inicializar mapas
+        clienteIds.forEach(id => {
+          pagamentosMap[id] = [];
+          cortesMap[id] = [];
+        });
+        
+        // Preencher com dados
+        todosPagamentos?.forEach(p => {
+          if (pagamentosMap[p.cliente_id]) {
+            pagamentosMap[p.cliente_id].push(p);
+          }
+        });
+        
+        todosCortes?.forEach(c => {
+          if (cortesMap[c.cliente_id]) {
+            cortesMap[c.cliente_id].push(c);
+          }
+        });
+        
+        setPagamentosPorCliente(pagamentosMap);
+        setCortesPorCliente(cortesMap);
       }
-      
-      setPagamentosPorCliente(pagamentosMap);
-      setCortesPorCliente(cortesMap);
     } catch (error) {
       toast.error("Erro ao carregar clientes");
     } finally {
