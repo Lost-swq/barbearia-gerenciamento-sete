@@ -57,6 +57,10 @@ const AdminDashboard = () => {
       const data = await getAllClientes();
       setClientes(data);
       
+      // Inicializar os mapas (mesmo se não houver clientes)
+      const pagamentosMap: Record<string, any[]> = {};
+      const cortesMap: Record<string, any[]> = {};
+      
       // Otimização: Buscar todos os históricos de uma vez usando IDs dos clientes
       const clienteIds = data.map(c => c.id);
       
@@ -74,10 +78,6 @@ const AdminDashboard = () => {
           .select('*')
           .in('cliente_id', clienteIds)
           .order('data', { ascending: false });
-        
-        // Organizar por cliente usando reduce para melhor performance
-        const pagamentosMap: Record<string, any[]> = {};
-        const cortesMap: Record<string, any[]> = {};
         
         // Inicializar mapas
         clienteIds.forEach(id => {
@@ -97,11 +97,12 @@ const AdminDashboard = () => {
             cortesMap[c.cliente_id].push(c);
           }
         });
-        
-        setPagamentosPorCliente(pagamentosMap);
-        setCortesPorCliente(cortesMap);
       }
+      
+      setPagamentosPorCliente(pagamentosMap);
+      setCortesPorCliente(cortesMap);
     } catch (error) {
+      console.error("Erro ao carregar clientes:", error);
       toast.error("Erro ao carregar clientes");
     } finally {
       setLoading(false);
