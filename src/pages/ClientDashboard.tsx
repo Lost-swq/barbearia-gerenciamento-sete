@@ -51,7 +51,7 @@ const ClientDashboard = () => {
 
   useEffect(() => {
     loadCliente();
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
     if (corteTimer) {

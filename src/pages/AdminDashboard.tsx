@@ -25,8 +25,7 @@ import {
   deleteCliente,
   adicionarCorte,
   getHistoricoPagamentos,
-  getHistoricoCortes,
-  getClienteByCpf
+  getHistoricoCortes
 } from "@/lib/database";
 
 const AdminDashboard = () => {
@@ -106,7 +105,7 @@ const AdminDashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [navigate]);
+  }, []);
 
   const handleLogout = () => {
     sessionStorage.removeItem("adminAuthenticated");
@@ -139,6 +138,7 @@ const AdminDashboard = () => {
 
     try {
       // Verifica se já existe cliente com esse CPF
+      const { getClienteByCpf } = await import("@/lib/database");
       const clienteExistente = await getClienteByCpf(cpf);
       
       if (clienteExistente) {
