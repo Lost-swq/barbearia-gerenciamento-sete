@@ -33,6 +33,7 @@ const AdminDashboard = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  const [pagamentosPorCliente, setPagamentosPorCliente] = useState<Record<string, any[]>>({});
 
   // Form states
   const [nome, setNome] = useState("");
@@ -51,6 +52,17 @@ const AdminDashboard = () => {
       await verificarEResetarCortes();
       const data = await getAllClientes();
       setClientes(data);
+      
+      // Carregar histórico de pagamentos para cada cliente
+      const { getHistoricoPagamentos } = await import("@/lib/database");
+      const pagamentosMap: Record<string, any[]> = {};
+      
+      for (const cliente of data) {
+        const pagamentos = await getHistoricoPagamentos(cliente.id);
+        pagamentosMap[cliente.id] = pagamentos;
+      }
+      
+      setPagamentosPorCliente(pagamentosMap);
     } catch (error) {
       toast.error("Erro ao carregar clientes");
     } finally {
@@ -632,7 +644,18 @@ const AdminDashboard = () => {
 
                         <div>
                           <p className="text-sm font-semibold text-foreground mb-2">Pagamentos Totais</p>
-                          <p className="text-xs text-muted-foreground">Consulte o histórico completo no painel</p>
+                          {pagamentosPorCliente[cliente.id]?.length > 0 ? (
+                            <div className="space-y-1">
+                              {pagamentosPorCliente[cliente.id].slice(0, 3).map((pag, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <span className="text-foreground font-medium">R$ {pag.valor.toFixed(2)}</span>
+                                  <span className="text-muted-foreground"> - {new Date(pag.data).toLocaleString('pt-BR')}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Nenhum pagamento registrado</p>
+                          )}
                         </div>
                       </div>
                     </div>
