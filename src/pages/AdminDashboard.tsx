@@ -11,13 +11,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { clienteCreateSchema } from "@/lib/validations";
 import { 
   getAllClientes, 
   addCliente, 
   Cliente, 
   PlanoType, 
-  PLANOS, 
-  CLIENT_CREATION_PIN,
+  PLANOS,
   registrarPagamento,
   calcularProximoReset,
   verificarEResetarCortes,
@@ -31,6 +32,7 @@ import {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, isAdmin, signOut } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,7 +51,6 @@ const AdminDashboard = () => {
     const hoje = new Date();
     return hoje.toISOString().split('T')[0]; // yyyy-mm-dd
   });
-  const [pin, setPin] = useState("");
   const [valorPagamento, setValorPagamento] = useState("");
 
   const loadClientes = async () => {
@@ -79,11 +80,13 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const isAdmin = sessionStorage.getItem("adminAuthenticated");
-    if (!isAdmin) {
-      navigate("/admin-login");
+    if (authLoading) return;
+    
+    if (!user || !isAdmin) {
+      navigate("/auth");
       return;
     }
+    
     loadClientes();
 
     // Configurar realtime para cortes
@@ -97,7 +100,6 @@ const AdminDashboard = () => {
           table: 'cortes_historico'
         },
         () => {
-          // Recarregar dados quando um novo corte for registrado
           loadClientes();
         }
       )
@@ -106,10 +108,10 @@ const AdminDashboard = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [navigate]);
+  }, [navigate, user, isAdmin, authLoading]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("adminAuthenticated");
+  const handleLogout = async () => {
+    await signOut();
     toast.success("Logout realizado");
     navigate("/");
   };
@@ -117,23 +119,15 @@ const AdminDashboard = () => {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pin !== CLIENT_CREATION_PIN) {
-      toast.error("PIN inválido — somente o dono pode criar clientes.");
+    try {
+      clienteCreateSchema.parse({ nome, sobrenome, cpf, plano });
+    } catch (error: any) {
+      toast.error(error.errors[0]?.message || "Dados inválidos");
       return;
     }
 
-    if (!nome || !sobrenome || !cpf || !dataPagamento) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
-
-    if (!/^\d{5}$/.test(cpf)) {
-      toast.error("CPF deve ter exatamente 5 dígitos numéricos");
-      return;
-    }
-
-    if (nome.length < 2 || sobrenome.length < 2) {
-      toast.error("Nome e sobrenome devem ter pelo menos 2 caracteres");
+    if (!dataPagamento) {
+      toast.error("Preencha a data de pagamento");
       return;
     }
 
@@ -154,8 +148,8 @@ const AdminDashboard = () => {
         sobrenome,
         cpf,
         plano,
-        data_pagamento: dataPagamento, // Formato yyyy-mm-dd para o banco
-        pin_criacao: pin,
+        data_pagamento: dataPagamento,
+        pin_criacao: '',  // No longer using PIN
         cortes_restantes: PLANOS[plano].cortes,
         cortes_bonus: 0
       });
@@ -173,7 +167,6 @@ const AdminDashboard = () => {
         const hoje = new Date();
         return hoje.toISOString().split('T')[0];
       });
-      setPin("");
       setDialogOpen(false);
       
       await loadClientes();
@@ -394,19 +387,6 @@ const AdminDashboard = () => {
                       type="date"
                       value={dataPagamento}
                       onChange={(e) => setDataPagamento(e.target.value)}
-                      className="bg-input border-border text-foreground"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="create-pin" className="text-foreground">PIN de Criação</Label>
-                    <Input
-                      id="create-pin"
-                      type="password"
-                      maxLength={5}
-                      placeholder="97531"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                       className="bg-input border-border text-foreground"
                     />
                   </div>

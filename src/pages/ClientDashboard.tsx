@@ -6,10 +6,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Scissors, Calendar, History, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes, getClienteById, getHistoricoCortes, getHistoricoPagamentos } from "@/lib/database";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes, getHistoricoCortes, getHistoricoPagamentos } from "@/lib/database";
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [loading, setLoading] = useState(true);
   const [corteTimer, setCorteTimer] = useState(false);
@@ -18,28 +21,43 @@ const ClientDashboard = () => {
   const [historicoPagamentos, setHistoricoPagamentos] = useState<any[]>([]);
 
   const loadCliente = async () => {
-    const clienteId = sessionStorage.getItem("clienteId");
-
-    if (!clienteId) {
-      navigate("/login");
-      return;
-    }
+    if (!user) return;
 
     try {
       await verificarEResetarCortes();
-      const clienteData = await getClienteById(clienteId);
+      
+      // Get profile to find cliente_id
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("cliente_id")
+        .eq("id", user.id)
+        .single();
 
-      if (!clienteData) {
-        toast.error("Cliente não encontrado");
-        navigate("/login");
+      if (profileError || !profile?.cliente_id) {
+        toast.error("Perfil não encontrado");
+        navigate("/auth");
         return;
       }
 
-      setCliente(clienteData);
+      // Get cliente data
+      const { data: clienteData, error: clienteError } = await supabase
+        .from("clientes")
+        .select("*")
+        .eq("id", profile.cliente_id)
+        .eq("ativo", true)
+        .single();
+
+      if (clienteError || !clienteData) {
+        toast.error("Cliente não encontrado");
+        navigate("/auth");
+        return;
+      }
+
+      setCliente(clienteData as Cliente);
       
       // Carregar históricos
-      const cortes = await getHistoricoCortes(clienteId);
-      const pagamentos = await getHistoricoPagamentos(clienteId);
+      const cortes = await getHistoricoCortes(profile.cliente_id);
+      const pagamentos = await getHistoricoPagamentos(profile.cliente_id);
       setHistoricoCortes(cortes);
       setHistoricoPagamentos(pagamentos);
     } catch (error) {
@@ -50,8 +68,15 @@ const ClientDashboard = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    
     loadCliente();
-  }, [navigate]);
+  }, [navigate, user, authLoading]);
 
   useEffect(() => {
     if (corteTimer) {
@@ -63,9 +88,8 @@ const ClientDashboard = () => {
     }
   }, [corteTimer]);
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("clienteId");
-    sessionStorage.removeItem("clienteNome");
+  const handleLogout = async () => {
+    await signOut();
     toast.success("Logout realizado");
     navigate("/");
   };
