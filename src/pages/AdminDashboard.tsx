@@ -176,8 +176,14 @@ const AdminDashboard = () => {
       setDialogOpen(false);
       
       await loadClientes();
-    } catch (error) {
-      toast.error("Erro ao criar cliente");
+    } catch (error: any) {
+      console.error("Erro ao criar cliente:", error);
+      const errorMessage = error?.message || "Erro ao criar cliente";
+      if (errorMessage.includes("duplicate") || errorMessage.includes("unique")) {
+        toast.error("Este CPF já está cadastrado no sistema");
+      } else {
+        toast.error(errorMessage);
+      }
     }
   };
 
