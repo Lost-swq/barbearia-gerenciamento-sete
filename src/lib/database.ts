@@ -229,8 +229,7 @@ export const registrarPagamento = async (
   if (clienteError || !cliente) throw new Error('Cliente não encontrado');
 
   const agora = new Date();
-  const novaDataPagamento = new Date(agora);
-  novaDataPagamento.setMonth(agora.getMonth() + 1);
+  const hoje = agora.toISOString().split('T')[0]; // formato yyyy-mm-dd
 
   const codigoConfirmacao = gerarCodigoConfirmacao();
 
@@ -245,14 +244,17 @@ export const registrarPagamento = async (
 
   if (pagamentoError) throw pagamentoError;
 
-  const novosCortesRestantes = cliente.cortes_restantes + PLANOS[cliente.plano].cortes;
+  const novosCortesRestantes = PLANOS[cliente.plano].cortes;
 
-  // Atualizar cliente
+  // Atualizar cliente - define data_pagamento e data_ultimo_reset como hoje
+  // O próximo reset será 31 dias depois
   const { error: updateError } = await supabase
     .from('clientes')
     .update({
-      data_pagamento: novaDataPagamento.toISOString().split('T')[0],
-      cortes_restantes: novosCortesRestantes
+      data_pagamento: hoje,
+      data_ultimo_reset: hoje,
+      cortes_restantes: novosCortesRestantes,
+      cortes_bonus: 0
     })
     .eq('id', clienteId);
 
@@ -264,18 +266,11 @@ const gerarCodigoConfirmacao = (): string => {
 };
 
 export const calcularProximoReset = (dataPagamento: string): Date => {
-  const dataBase = new Date(dataPagamento);
-  const hoje = new Date();
-  
-  const proximoReset = new Date(dataBase);
-  proximoReset.setMonth(hoje.getMonth() + 1);
-  proximoReset.setFullYear(hoje.getFullYear());
-  
-  if (proximoReset < hoje) {
-    proximoReset.setMonth(proximoReset.getMonth() + 1);
-  }
-  
-  return proximoReset;
+  // Formato esperado: yyyy-mm-dd
+  const data = new Date(dataPagamento);
+  // Adiciona 31 dias à data de pagamento
+  data.setDate(data.getDate() + 31);
+  return data;
 };
 
 export const verificarEResetarCortes = async (): Promise<void> => {
