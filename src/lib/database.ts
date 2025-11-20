@@ -232,7 +232,8 @@ export const adicionarCorte = async (clienteId: string): Promise<void> => {
 
 export const registrarPagamento = async (
   clienteId: string,
-  valor: number
+  valor: number,
+  dataPagamento?: string
 ): Promise<void> => {
   const { data: cliente, error: clienteError } = await supabase
     .from('clientes')
@@ -245,13 +246,20 @@ export const registrarPagamento = async (
   const codigoConfirmacao = gerarCodigoConfirmacao();
 
   // Inserir no histórico de pagamentos
+  const pagamentoData: any = {
+    cliente_id: clienteId,
+    valor,
+    confirmacao: codigoConfirmacao
+  };
+
+  // Se foi fornecida uma data específica, usar ela
+  if (dataPagamento) {
+    pagamentoData.data = dataPagamento;
+  }
+
   const { error: pagamentoError } = await supabase
     .from('pagamentos_historico')
-    .insert({
-      cliente_id: clienteId,
-      valor,
-      confirmacao: codigoConfirmacao
-    });
+    .insert(pagamentoData);
 
   if (pagamentoError) throw pagamentoError;
 };
