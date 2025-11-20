@@ -49,13 +49,9 @@ export const PLANOS = {
   }
 };
 
-export const ADMIN_CREDENTIALS = {
-  nome: 'Kelven',
-  sobrenome: 'Jarqueles',
-  pin: '08642'
-};
-
-export const CLIENT_CREATION_PIN = '97531';
+// Authentication is now handled via Supabase Auth
+// Admin roles are managed in the user_roles table
+// No hardcoded credentials
 
 // Funções auxiliares
 export const getClienteById = async (id: string): Promise<Cliente | undefined> => {

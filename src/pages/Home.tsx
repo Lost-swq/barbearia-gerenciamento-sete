@@ -27,7 +27,10 @@ const Home = () => {
         </div>
 
         <Card className="p-6 space-y-4 border-2 border-border bg-card shadow-green">
-          <Button onClick={() => navigate("/login")} className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all hover:scale-[1.02]">
+          <Button
+            onClick={() => navigate("/auth")}
+            className="w-full h-14 text-lg font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg transition-all hover:scale-[1.02]"
+          >
             <Scissors className="w-5 h-5 mr-2" />
             Sou Cliente
           </Button>
@@ -41,7 +44,11 @@ const Home = () => {
             </div>
           </div>
 
-          <Button onClick={() => navigate("/admin-login")} variant="outline" className="w-full h-14 text-lg font-semibold border-2 border-primary text-foreground hover:bg-primary/10 transition-all hover:scale-[1.02]">
+          <Button
+            onClick={() => navigate("/auth")}
+            variant="outline"
+            className="w-full h-14 text-lg font-semibold border-2 border-primary text-foreground hover:bg-primary/10 transition-all hover:scale-[1.02]"
+          >
             <UserCog className="w-5 h-5 mr-2" />
             Sou Admin
           </Button>
