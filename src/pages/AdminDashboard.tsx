@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus } from "lucide-react";
+import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -36,6 +36,7 @@ const AdminDashboard = () => {
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
   const [pagamentosPorCliente, setPagamentosPorCliente] = useState<Record<string, any[]>>({});
   const [cortesPorCliente, setCortesPorCliente] = useState<Record<string, any[]>>({});
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Form states
   const [nome, setNome] = useState("");
@@ -520,18 +521,47 @@ const AdminDashboard = () => {
 
         {/* Lista de Clientes */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-6 h-6 text-primary" />
-            Clientes Ativos
-          </h2>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <Users className="w-6 h-6 text-primary" />
+              Clientes Ativos
+            </h2>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou sobrenome..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-input border-border text-foreground"
+              />
+            </div>
+          </div>
 
           {clientes.length === 0 ? (
             <Card className="p-8 border-border bg-card text-center">
               <p className="text-muted-foreground">Nenhum cliente cadastrado ainda</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {clientes.map((cliente) => {
+            (() => {
+              const filteredClientes = clientes.filter((cliente) => {
+                const searchLower = searchTerm.toLowerCase();
+                return (
+                  cliente.nome.toLowerCase().includes(searchLower) ||
+                  cliente.sobrenome.toLowerCase().includes(searchLower)
+                );
+              });
+
+              if (filteredClientes.length === 0) {
+                return (
+                  <Card className="p-8 border-border bg-card text-center">
+                    <p className="text-muted-foreground">Nenhum cliente encontrado com esse nome</p>
+                  </Card>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 gap-4">
+                  {filteredClientes.map((cliente) => {
                 const planoInfo = PLANOS[cliente.plano];
                 const proximoReset = calcularProximoReset(cliente.data_pagamento);
                 
@@ -709,6 +739,8 @@ const AdminDashboard = () => {
                 );
               })}
             </div>
+              );
+            })()
           )}
         </div>
       </div>
