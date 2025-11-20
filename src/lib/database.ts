@@ -152,9 +152,22 @@ export const updateCliente = async (id: string, updates: Partial<Cliente>): Prom
 };
 
 export const deleteCliente = async (id: string): Promise<void> => {
+  // Deletar histórico de cortes
+  await supabase
+    .from('cortes_historico')
+    .delete()
+    .eq('cliente_id', id);
+  
+  // Deletar histórico de pagamentos
+  await supabase
+    .from('pagamentos_historico')
+    .delete()
+    .eq('cliente_id', id);
+  
+  // Deletar o cliente
   const { error } = await supabase
     .from('clientes')
-    .update({ ativo: false })
+    .delete()
     .eq('id', id);
   
   if (error) throw error;
