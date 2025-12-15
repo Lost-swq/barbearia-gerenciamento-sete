@@ -65,7 +65,7 @@ export const getClienteById = async (id: string): Promise<Cliente | undefined> =
     .eq('id', id)
     .eq('ativo', true)
     .single();
-  
+
   if (error) return undefined;
   return data as Cliente;
 };
@@ -77,7 +77,7 @@ export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined>
     .eq('cpf', cpf)
     .eq('ativo', true)
     .single();
-  
+
   if (error) return undefined;
   return data as Cliente;
 };
@@ -95,7 +95,7 @@ export const getClienteByCredentials = async (
     .ilike('nome', nome)
     .ilike('sobrenome', sobrenome)
     .single();
-  
+
   if (error) return undefined;
   return data as Cliente;
 };
@@ -106,7 +106,7 @@ export const getAllClientes = async (): Promise<Cliente[]> => {
     .select('*')
     .eq('ativo', true)
     .order('created_at', { ascending: false });
-  
+
   if (error) throw error;
   return data as Cliente[];
 };
@@ -137,7 +137,7 @@ export const addCliente = async (cliente: {
     })
     .select()
     .single();
-  
+
   if (error) throw error;
   return data.id;
 };
@@ -147,7 +147,7 @@ export const updateCliente = async (id: string, updates: Partial<Cliente>): Prom
     .from('clientes')
     .update(updates)
     .eq('id', id);
-  
+
   if (error) throw error;
 };
 
@@ -157,19 +157,19 @@ export const deleteCliente = async (id: string): Promise<void> => {
     .from('cortes_historico')
     .delete()
     .eq('cliente_id', id);
-  
+
   // Deletar histórico de pagamentos
   await supabase
     .from('pagamentos_historico')
     .delete()
     .eq('cliente_id', id);
-  
+
   // Deletar o cliente
   const { error } = await supabase
     .from('clientes')
     .delete()
     .eq('id', id);
-  
+
   if (error) throw error;
 };
 
@@ -180,19 +180,19 @@ export const deleteAllClientes = async (): Promise<void> => {
     .from('cortes_historico')
     .delete()
     .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-  
+
   // Deletar todos os históricos de pagamentos
   await supabase
     .from('pagamentos_historico')
     .delete()
     .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-  
+
   // Deletar todos os clientes
   const { error } = await supabase
     .from('clientes')
     .delete()
     .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-  
+
   if (error) throw error;
 };
 
@@ -210,7 +210,7 @@ export const registrarCorte = async (clienteId: string): Promise<void> => {
   }
 
   const usandoBonus = (cliente.cortes_bonus || 0) > 0;
-  
+
   // Inserir no histórico de cortes
   const { error: corteError } = await supabase
     .from('cortes_historico')
@@ -285,18 +285,92 @@ export const registrarPagamento = async (
     .insert(pagamentoData);
 
   if (pagamentoError) throw pagamentoError;
+
+  // Lógica de Pagamento Cumulativo
+  // Se o cliente paga antes do vencimento, estendemos a data base do pagamento em 1 mês
+  // Se paga depois (vencido), a data base vira a data atual (ou a data do pagamento informada)
+
+  let novaDataPagamento: Date;
+  const dataPagamentoEfetivo = dataPagamento ? new Date(dataPagamento) : new Date();
+
+  // Normalizar datas para comparação (zerar horas)
+  dataPagamentoEfetivo.setHours(12, 0, 0, 0); // Meio-dia para evitar timezone issues
+
+  // Verifica se está dentro da validade
+  if (podeFazerCheckin(cliente)) {
+    // Cliente adimplente: Soma 1 mês à data de referência antiga
+    novaDataPagamento = new Date(cliente.data_pagamento);
+    // Adiciona "T12:00:00Z" se não tiver, para parse correto
+    if (!cliente.data_pagamento.includes('T')) {
+      novaDataPagamento = new Date(`${cliente.data_pagamento}T12:00:00Z`);
+    }
+
+    const diaOriginal = novaDataPagamento.getUTCDate();
+    novaDataPagamento.setUTCMonth(novaDataPagamento.getUTCMonth() + 1);
+
+    // Ajuste de overflow de mês (ex: 31/01 -> 03/03 -> 28/02)
+    if (novaDataPagamento.getUTCDate() !== diaOriginal) {
+      novaDataPagamento.setUTCDate(0);
+    }
+  } else {
+    // Cliente inadimplente ou primeira vez: Data base vira a data do pagamento atual
+    novaDataPagamento = dataPagamentoEfetivo;
+  }
+
+  // Atualiza o cliente com a nova data base
+  const { error: updateError } = await supabase
+    .from('clientes')
+    .update({
+      data_pagamento: novaDataPagamento.toISOString().split('T')[0], // yyyy-mm-dd
+      data_ultimo_reset: novaDataPagamento.toISOString().split('T')[0] // Atualiza reset também
+    })
+    .eq('id', clienteId);
+
+  if (updateError) throw updateError;
 };
 
 const gerarCodigoConfirmacao = (): string => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+export const calcularVencimento = (dataPagamento: string): Date => {
+  // Garante que a data seja tratada como UTC meio-dia para evitar problemas de fuso
+  // Se a string for apenas yyyy-mm-dd, adiciona T12:00:00Z
+  const isoString = dataPagamento.includes('T') ? dataPagamento : `${dataPagamento}T12:00:00Z`;
+  const vencimento = new Date(isoString);
+
+  const diaOriginal = vencimento.getUTCDate();
+  vencimento.setUTCMonth(vencimento.getUTCMonth() + 1);
+
+  // Tratamento de overflow (ex: 31 Jan -> 3 Mar -> Volta para 28/29 Fev)
+  if (vencimento.getUTCDate() !== diaOriginal) {
+    vencimento.setUTCDate(0); // Volta para o último dia do mês anterior
+  }
+
+  return vencimento;
+};
+
+export const podeFazerCheckin = (cliente: Cliente): boolean => {
+  if (!cliente.ativo) return false;
+
+  // Se não tiver data de pagamento, bloqueia
+  if (!cliente.data_pagamento) return false;
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0); // Considera início do dia
+
+  // Calcula vencimento baseado na data do último pagamento
+  const vencimento = calcularVencimento(cliente.data_pagamento);
+
+  // Define o vencimento para o final do dia (tolerância até 23:59:59)
+  vencimento.setUTCHours(23, 59, 59, 999);
+
+  // Permite check-in se hoje for anterior ou igual ao vencimento
+  return hoje.getTime() <= vencimento.getTime();
+};
+
 export const calcularProximoReset = (dataPagamento: string): Date => {
-  // Formato esperado: yyyy-mm-dd
-  const data = new Date(dataPagamento);
-  // Adiciona 31 dias à data de pagamento
-  data.setDate(data.getDate() + 31);
-  return data;
+  return calcularVencimento(dataPagamento);
 };
 
 export const verificarEResetarCortes = async (): Promise<void> => {
@@ -306,21 +380,21 @@ export const verificarEResetarCortes = async (): Promise<void> => {
     .eq('ativo', true);
 
   if (error || !clientes) return;
-  
+
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  
+
   for (const cliente of clientes) {
     // Determina a data base para calcular o próximo reset
-    const dataBase = cliente.data_ultimo_reset 
+    const dataBase = cliente.data_ultimo_reset
       ? new Date(cliente.data_ultimo_reset)
       : new Date(cliente.data_pagamento);
-    
+
     // Calcula a data do próximo reset (31 dias após a data base)
     const proximoReset = new Date(dataBase);
     proximoReset.setDate(proximoReset.getDate() + 31);
     proximoReset.setHours(0, 0, 0, 0);
-    
+
     // Se hoje >= próximo reset, fazer o reset
     if (hoje >= proximoReset) {
       await supabase
@@ -342,7 +416,7 @@ export const getHistoricoCortes = async (clienteId: string): Promise<CorteHistor
     .select('*')
     .eq('cliente_id', clienteId)
     .order('data', { ascending: false });
-  
+
   if (error) throw error;
   return data as CorteHistorico[];
 };
@@ -354,7 +428,7 @@ export const getHistoricoPagamentos = async (clienteId: string): Promise<Pagamen
     .select('*')
     .eq('cliente_id', clienteId)
     .order('data', { ascending: false });
-  
+
   if (error) throw error;
   return data as PagamentoHistorico[];
 };

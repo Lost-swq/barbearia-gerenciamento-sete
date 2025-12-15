@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { LogOut, Scissors, Calendar, History, DollarSign } from "lucide-react";
 import { toast } from "sonner";
-import { Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes, getClienteById, getHistoricoCortes, getHistoricoPagamentos } from "@/lib/database";
+import { Cliente, registrarCorte, calcularProximoReset, PLANOS, verificarEResetarCortes, getClienteById, getHistoricoCortes, getHistoricoPagamentos, podeFazerCheckin } from "@/lib/database";
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ const ClientDashboard = () => {
       }
 
       setCliente(clienteData);
-      
+
       // Carregar históricos
       const cortes = await getHistoricoCortes(clienteId);
       const pagamentos = await getHistoricoPagamentos(clienteId);
@@ -79,18 +79,10 @@ const ClientDashboard = () => {
       return;
     }
 
-    // Verifica se há pelo menos um pagamento registrado no mês atual
-    const hoje = new Date();
-    const mesAtual = hoje.getMonth();
-    const anoAtual = hoje.getFullYear();
-
-    const temPagamentoMesAtual = historicoPagamentos.some(pagamento => {
-      const dataPag = new Date(pagamento.data);
-      return dataPag.getMonth() === mesAtual && dataPag.getFullYear() === anoAtual;
-    });
-
-    if (!temPagamentoMesAtual) {
-      toast.error("Você precisa ter um pagamento registrado no mês atual para registrar cortes.");
+    // Verifica validade da mensalidade
+    if (!podeFazerCheckin(cliente)) {
+      const vencimento = calcularProximoReset(cliente.data_pagamento);
+      toast.error(`Mensalidade vencida em ${vencimento.toLocaleDateString('pt-BR')}. Por favor, renove seu plano.`);
       return;
     }
 

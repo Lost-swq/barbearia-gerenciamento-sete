@@ -11,12 +11,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { LogOut, UserPlus, Users, DollarSign, Scissors, Edit, Trash2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  getAllClientes, 
-  addCliente, 
-  Cliente, 
-  PlanoType, 
-  PLANOS, 
+import {
+  getAllClientes,
+  addCliente,
+  Cliente,
+  PlanoType,
+  PLANOS,
   CLIENT_CREATION_PIN,
   registrarPagamento,
   calcularProximoReset,
@@ -56,14 +56,14 @@ const AdminDashboard = () => {
       await verificarEResetarCortes();
       const data = await getAllClientes();
       setClientes(data);
-      
+
       // Inicializar os mapas (mesmo se não houver clientes)
       const pagamentosMap: Record<string, any[]> = {};
       const cortesMap: Record<string, any[]> = {};
-      
+
       // Otimização: Buscar todos os históricos de uma vez usando IDs dos clientes
       const clienteIds = data.map(c => c.id);
-      
+
       if (clienteIds.length > 0) {
         // Buscar todos os pagamentos de uma vez (1 query em vez de N)
         const { data: todosPagamentos } = await supabase
@@ -71,34 +71,34 @@ const AdminDashboard = () => {
           .select('*')
           .in('cliente_id', clienteIds)
           .order('data', { ascending: false });
-        
+
         // Buscar todos os cortes de uma vez (1 query em vez de N)
         const { data: todosCortes } = await supabase
           .from('cortes_historico')
           .select('*')
           .in('cliente_id', clienteIds)
           .order('data', { ascending: false });
-        
+
         // Inicializar mapas
         clienteIds.forEach(id => {
           pagamentosMap[id] = [];
           cortesMap[id] = [];
         });
-        
+
         // Preencher com dados
         todosPagamentos?.forEach(p => {
           if (pagamentosMap[p.cliente_id]) {
             pagamentosMap[p.cliente_id].push(p);
           }
         });
-        
+
         todosCortes?.forEach(c => {
           if (cortesMap[c.cliente_id]) {
             cortesMap[c.cliente_id].push(c);
           }
         });
       }
-      
+
       setPagamentosPorCliente(pagamentosMap);
       setCortesPorCliente(cortesMap);
     } catch (error) {
@@ -172,7 +172,7 @@ const AdminDashboard = () => {
       // Verifica se já existe cliente com esse CPF
       const { getClienteByCpf } = await import("@/lib/database");
       const clienteExistente = await getClienteByCpf(cpf);
-      
+
       if (clienteExistente) {
         toast.error("Já existe um cliente cadastrado com este CPF");
         return;
@@ -186,16 +186,22 @@ const AdminDashboard = () => {
         sobrenome,
         cpf,
         plano,
-        data_pagamento: dataPagamento, // Formato yyyy-mm-dd para o banco
+        data_pagamento: `${dataPagamento}T12:00:00Z`, // Adiciona meio-dia UTC para evitar problemas de fuso
         pin_criacao: pin,
         cortes_restantes: PLANOS[plano].cortes,
         cortes_bonus: 0
       });
 
-      // Registrar o primeiro pagamento com a data escolhida
-      await registrarPagamento(clienteId, valorPlano, dataPagamento);
+      // Registrar o primeiro pagamento
+      // Se a data escolhida for hoje, usamos o timestamp atual para ficar preciso no histórico
+      const hojeYmd = new Date().toLocaleDateString('pt-BR').split('/').reverse().join('-');
+      const timestampPagamento = dataPagamento === hojeYmd
+        ? new Date().toISOString()
+        : `${dataPagamento}T12:00:00Z`;
+
+      await registrarPagamento(clienteId, valorPlano, timestampPagamento);
       toast.success("Cliente criado! Primeiro pagamento registrado automaticamente.");
-      
+
       // Reset form
       setNome("");
       setSobrenome("");
@@ -207,7 +213,7 @@ const AdminDashboard = () => {
       });
       setPin("");
       setDialogOpen(false);
-      
+
       await loadClientes();
     } catch (error: any) {
       console.error("Erro ao criar cliente:", error);
@@ -234,7 +240,7 @@ const AdminDashboard = () => {
       return;
     }
 
-    try{
+    try {
       await registrarPagamento(clienteSelecionado.id, valor);
       toast.success("Pagamento registrado com sucesso!");
       setValorPagamento("");
@@ -252,13 +258,13 @@ const AdminDashboard = () => {
     setSobrenome(cliente.sobrenome);
     setCpf(cliente.cpf);
     setPlano(cliente.plano);
-    // Converte data de dd/mm/yyyy para yyyy-mm-dd se necessário
+    // Converte data de dd/mm/yyyy ou ISO para yyyy-mm-dd
     const dataFormatada = cliente.data_pagamento.includes('-')
-      ? cliente.data_pagamento
+      ? cliente.data_pagamento.split('T')[0]
       : (() => {
-          const [dia, mes, ano] = cliente.data_pagamento.split('/').map(Number);
-          return `${ano}-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
-        })();
+        const [dia, mes, ano] = cliente.data_pagamento.split('/').map(Number);
+        return `${ano}-${mes.toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
+      })();
     setDataPagamento(dataFormatada);
     setEditDialogOpen(true);
   };
@@ -288,7 +294,7 @@ const AdminDashboard = () => {
       if (cpf !== clienteSelecionado.cpf) {
         const { getClienteByCpf } = await import("@/lib/database");
         const clienteExistente = await getClienteByCpf(cpf);
-        
+
         if (clienteExistente && clienteExistente.id !== clienteSelecionado.id) {
           toast.error("Já existe outro cliente cadastrado com este CPF");
           return;
@@ -302,11 +308,11 @@ const AdminDashboard = () => {
         sobrenome,
         cpf,
         plano,
-        data_pagamento: dataPagamento
+        data_pagamento: `${dataPagamento}T12:00:00Z`
       });
-      
+
       toast.success("Cliente atualizado com sucesso!");
-      
+
       // Reset form
       setNome("");
       setSobrenome("");
@@ -318,7 +324,7 @@ const AdminDashboard = () => {
       });
       setEditDialogOpen(false);
       setClienteSelecionado(null);
-      
+
       await loadClientes();
     } catch (error) {
       toast.error("Erro ao atualizar cliente");
@@ -337,7 +343,7 @@ const AdminDashboard = () => {
 
   const handleAdicionarCorte = async (cliente: Cliente) => {
     if (!cliente.id) return;
-    
+
     try {
       await adicionarCorte(cliente.id);
       toast.success("Corte adicionado com sucesso!");
@@ -576,10 +582,16 @@ const AdminDashboard = () => {
           ) : (
             (() => {
               const filteredClientes = clientes.filter((cliente) => {
-                const searchLower = searchTerm.toLowerCase();
+                const normalize = (str: string) => str.toLowerCase().replace(/\s+/g, '');
+                const search = normalize(searchTerm);
+                const nome = normalize(cliente.nome);
+                const sobrenome = normalize(cliente.sobrenome);
+                const nomeCompleto = normalize(`${cliente.nome}${cliente.sobrenome}`);
+
                 return (
-                  cliente.nome.toLowerCase().includes(searchLower) ||
-                  cliente.sobrenome.toLowerCase().includes(searchLower)
+                  nome.includes(search) ||
+                  sobrenome.includes(search) ||
+                  nomeCompleto.includes(search)
                 );
               });
 
@@ -594,183 +606,191 @@ const AdminDashboard = () => {
               return (
                 <div className="grid grid-cols-1 gap-4">
                   {filteredClientes.map((cliente) => {
-                const planoInfo = PLANOS[cliente.plano];
-                const proximoReset = calcularProximoReset(cliente.data_pagamento);
-                
-                return (
-                  <Card key={cliente.id} className="p-6 border-2 border-border bg-card hover:border-primary transition-colors">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between flex-wrap gap-2">
-                        <div>
-                          <h3 className="text-xl font-bold text-foreground">
-                            {cliente.nome} {cliente.sobrenome}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">CPF: {cliente.cpf}</p>
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleEditClient(cliente)}
-                            className="border-primary text-foreground hover:bg-primary/10"
-                          >
-                            <Edit className="w-4 h-4 mr-1" />
-                            Editar
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
+                    const planoInfo = PLANOS[cliente.plano];
+                    const proximoReset = calcularProximoReset(cliente.data_pagamento);
+
+                    return (
+                      <Card key={cliente.id} className="p-6 border-2 border-border bg-card hover:border-primary transition-colors">
+                        <div className="space-y-4">
+                          <div className="flex items-start justify-between flex-wrap gap-2">
+                            <div>
+                              <h3 className="text-xl font-bold text-foreground">
+                                {cliente.nome} {cliente.sobrenome}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">CPF: {cliente.cpf}</p>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-destructive text-destructive hover:bg-destructive/10"
+                                onClick={() => handleEditClient(cliente)}
+                                className="border-primary text-foreground hover:bg-primary/10"
                               >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Excluir
+                                <Edit className="w-4 h-4 mr-1" />
+                                Editar
                               </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-card border-2 border-border">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-foreground">Confirmar Exclusão</AlertDialogTitle>
-                                <AlertDialogDescription className="text-muted-foreground">
-                                  Tem certeza de que deseja excluir o cliente <strong>{cliente.nome} {cliente.sobrenome}</strong>? Esta ação não pode ser desfeita.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteClient(cliente)}
-                                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                                >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => handleAdicionarCorte(cliente)}
-                            className="border-primary text-foreground hover:bg-primary/10"
-                          >
-                            <Plus className="w-4 h-4 mr-1" />
-                            Adicionar Corte
-                          </Button>
-                          <Dialog open={pagamentoDialogOpen && clienteSelecionado?.id === cliente.id}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-destructive text-destructive hover:bg-destructive/10"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-1" />
+                                    Excluir
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="bg-card border-2 border-border">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="text-foreground">Confirmar Exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-muted-foreground">
+                                      Tem certeza de que deseja excluir o cliente <strong>{cliente.nome} {cliente.sobrenome}</strong>? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel className="border-border text-foreground hover:bg-muted">Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteClient(cliente)}
+                                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                                    >
+                                      Excluir
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAdicionarCorte(cliente)}
+                                className="border-primary text-foreground hover:bg-primary/10"
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Adicionar Corte
+                              </Button>
+                              <Dialog open={pagamentoDialogOpen && clienteSelecionado?.id === cliente.id}
                                 onOpenChange={(open) => {
                                   setPagamentoDialogOpen(open);
                                   if (!open) setClienteSelecionado(null);
                                 }}>
-                          <DialogTrigger asChild>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => setClienteSelecionado(cliente)}
-                              className="border-primary text-foreground hover:bg-primary/10"
-                            >
-                              <DollarSign className="w-4 h-4 mr-1" />
-                              Registrar Pagamento
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="bg-card border-2 border-border">
-                            <DialogHeader>
-                              <DialogTitle className="text-foreground">Registrar Pagamento</DialogTitle>
-                            </DialogHeader>
-                            <form onSubmit={handleRegistrarPagamento} className="space-y-4">
-                              <div className="space-y-2">
-                                <Label className="text-foreground">Cliente</Label>
-                                <p className="text-foreground font-semibold">
-                                  {cliente.nome} {cliente.sobrenome}
-                                </p>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="valor-pag" className="text-foreground">Valor (R$)</Label>
-                                <Input
-                                  id="valor-pag"
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="95.00"
-                                  value={valorPagamento}
-                                  onChange={(e) => setValorPagamento(e.target.value)}
-                                  className="bg-input border-border text-foreground"
-                                />
-                              </div>
-                              <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                                Confirmar Pagamento
-                              </Button>
-                            </form>
-                          </DialogContent>
-                        </Dialog>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Plano</p>
-                          <p className="font-semibold text-primary">{planoInfo.nome}</p>
-                          <p className="text-sm text-foreground">R$ {planoInfo.valor.toFixed(2)}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm text-muted-foreground">Data Pagamento</p>
-                          <p className="font-semibold text-foreground">{new Date(cliente.data_pagamento).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                        
-                        <div>
-                          <p className="text-sm text-muted-foreground">Cortes Restantes</p>
-                          <p className="font-semibold text-foreground flex items-center gap-1">
-                            <Scissors className="w-4 h-4 text-primary" />
-                            {cliente.cortes_restantes} de {planoInfo.cortes}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm text-muted-foreground">Próximo Reset</p>
-                          <p className="font-semibold text-foreground">
-                            {proximoReset.toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground mb-2">Cortes Realizados</p>
-                          {cortesPorCliente[cliente.id]?.length > 0 ? (
-                            <div className="space-y-1">
-                              {cortesPorCliente[cliente.id].slice(0, 3).map((corte, idx) => (
-                                <div key={idx} className="text-xs">
-                                  <span className="text-foreground">{new Date(corte.data).toLocaleString('pt-BR')}</span>
-                                  {corte.tipo === 'admin' && (
-                                    <span className="text-primary ml-1">(Bônus)</span>
-                                  )}
-                                </div>
-                              ))}
+                                <DialogTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setClienteSelecionado(cliente)}
+                                    className="border-primary text-foreground hover:bg-primary/10"
+                                  >
+                                    <DollarSign className="w-4 h-4 mr-1" />
+                                    Registrar Pagamento
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="bg-card border-2 border-border">
+                                  <DialogHeader>
+                                    <DialogTitle className="text-foreground">Registrar Pagamento</DialogTitle>
+                                  </DialogHeader>
+                                  <form onSubmit={handleRegistrarPagamento} className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label className="text-foreground">Cliente</Label>
+                                      <p className="text-foreground font-semibold">
+                                        {cliente.nome} {cliente.sobrenome}
+                                      </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="valor-pag" className="text-foreground">Valor (R$)</Label>
+                                      <Input
+                                        id="valor-pag"
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="95.00"
+                                        value={valorPagamento}
+                                        onChange={(e) => setValorPagamento(e.target.value)}
+                                        className="bg-input border-border text-foreground"
+                                      />
+                                    </div>
+                                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                                      Confirmar Pagamento
+                                    </Button>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
                             </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Nenhum corte registrado</p>
-                          )}
-                        </div>
+                          </div>
 
-                        <div>
-                          <p className="text-sm font-semibold text-foreground mb-2">Pagamentos Totais</p>
-                          {pagamentosPorCliente[cliente.id]?.length > 0 ? (
-                            <div className="space-y-1">
-                              {pagamentosPorCliente[cliente.id].slice(0, 3).map((pag, idx) => (
-                                <div key={idx} className="text-xs">
-                                  <span className="text-foreground font-medium">R$ {pag.valor.toFixed(2)}</span>
-                                  <span className="text-muted-foreground"> - {new Date(pag.data).toLocaleString('pt-BR')}</span>
-                                </div>
-                              ))}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                              <p className="text-sm text-muted-foreground">Plano</p>
+                              <p className="font-semibold text-primary">{planoInfo.nome}</p>
+                              <p className="text-sm text-foreground">R$ {planoInfo.valor.toFixed(2)}</p>
                             </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Nenhum pagamento registrado</p>
-                          )}
+
+                            <div>
+                              <p className="text-sm text-muted-foreground">Data Pagamento</p>
+                              <p className="font-semibold text-foreground">
+                                {(() => {
+                                  if (!cliente.data_pagamento) return '-';
+                                  // Fix: Parse manual para evitar problema de timezone (yyyy-mm-dd -> visualização correta)
+                                  const [ano, mes, dia] = cliente.data_pagamento.split('T')[0].split('-').map(Number);
+                                  const data = new Date(ano, mes - 1, dia, 12, 0, 0);
+                                  return data.toLocaleDateString('pt-BR');
+                                })()}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-sm text-muted-foreground">Cortes Restantes</p>
+                              <p className="font-semibold text-foreground flex items-center gap-1">
+                                <Scissors className="w-4 h-4 text-primary" />
+                                {cliente.cortes_restantes} de {planoInfo.cortes}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-sm text-muted-foreground">Vencimento Mensalidade</p>
+                              <p className={`font-semibold ${new Date() > proximoReset ? 'text-destructive' : 'text-foreground'}`}>
+                                {proximoReset.toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground mb-2">Cortes Realizados</p>
+                              {cortesPorCliente[cliente.id]?.length > 0 ? (
+                                <div className="space-y-1">
+                                  {cortesPorCliente[cliente.id].slice(0, 3).map((corte, idx) => (
+                                    <div key={idx} className="text-xs">
+                                      <span className="text-foreground">{new Date(corte.data).toLocaleString('pt-BR')}</span>
+                                      {corte.tipo === 'admin' && (
+                                        <span className="text-primary ml-1">(Bônus)</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">Nenhum corte registrado</p>
+                              )}
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-semibold text-foreground mb-2">Pagamentos Totais</p>
+                              {pagamentosPorCliente[cliente.id]?.length > 0 ? (
+                                <div className="space-y-1">
+                                  {pagamentosPorCliente[cliente.id].slice(0, 3).map((pag, idx) => (
+                                    <div key={idx} className="text-xs">
+                                      <span className="text-foreground font-medium">R$ {pag.valor.toFixed(2)}</span>
+                                      <span className="text-muted-foreground"> - {new Date(pag.data).toLocaleString('pt-BR')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">Nenhum pagamento registrado</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                      </Card>
+                    );
+                  })}
+                </div>
               );
             })()
           )}
