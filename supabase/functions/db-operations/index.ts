@@ -80,7 +80,8 @@ serve(async (req) => {
     // Define action categories
     const writeActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'registrar_corte', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
     const adminReadActions = ['get_clientes', 'get_all_pagamentos', 'get_all_cortes'];
-    const clientReadActions = ['get_cliente_by_credentials', 'get_cliente_by_id', 'get_cliente_by_cpf', 'get_historico_pagamentos', 'get_historico_cortes'];
+    const publicActions = ['get_cliente_by_credentials']; // Login action - no auth needed
+    const clientReadActions = ['get_cliente_by_id', 'get_cliente_by_cpf', 'get_historico_pagamentos', 'get_historico_cortes'];
 
     // Admin token validation for write + admin-read actions
     const adminToken = req.headers.get('x-admin-token');
