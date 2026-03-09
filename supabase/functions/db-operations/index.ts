@@ -78,19 +78,32 @@ serve(async (req) => {
     const { action, payload } = await req.json();
 
     // Define action categories
-    const writeActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'registrar_corte', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
+    const adminOnlyActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
     const adminReadActions = ['get_clientes', 'get_all_pagamentos', 'get_all_cortes'];
     const publicActions = ['get_cliente_by_credentials']; // Login action - no auth needed
+    const clientActions = ['registrar_corte']; // Client can register their own cuts
     const clientReadActions = ['get_cliente_by_id', 'get_cliente_by_cpf', 'get_historico_pagamentos', 'get_historico_cortes'];
 
-    // Admin token validation for write + admin-read actions
+    // Admin token validation for admin-only write + admin-read actions
     const adminToken = req.headers.get('x-admin-token');
     const clientSession = req.headers.get('x-client-session');
 
-    if (writeActions.includes(action) || adminReadActions.includes(action)) {
+    if (adminOnlyActions.includes(action) || adminReadActions.includes(action)) {
       if (!adminToken || !(await verifyAdminToken(adminToken))) {
         return new Response(
           JSON.stringify({ error: 'Token de admin inválido ou expirado' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Client actions require either admin token OR valid client session
+    if (clientActions.includes(action)) {
+      const isAdmin = adminToken && await verifyAdminToken(adminToken);
+      const hasClientSession = clientSession && payload?.cliente_id && verifyClientSession(clientSession, payload.cliente_id);
+      if (!isAdmin && !hasClientSession) {
+        return new Response(
+          JSON.stringify({ error: 'Autenticação necessária' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -240,10 +253,33 @@ serve(async (req) => {
 
       case 'registrar_corte': {
         const { cliente_id, tipo } = payload;
-        const { error } = await supabase
+        // Get current client data
+        const { data: clienteData, error: fetchErr } = await supabase
+          .from('clientes')
+          .select('cortes_restantes, cortes_bonus')
+          .eq('id', cliente_id)
+          .single();
+        if (fetchErr || !clienteData) throw fetchErr || new Error('Cliente não encontrado');
+        if (clienteData.cortes_restantes <= 0) {
+          return new Response(
+            JSON.stringify({ error: 'Sem cortes disponíveis' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const usandoBonus = (clienteData.cortes_bonus || 0) > 0;
+        const { error: insertErr } = await supabase
           .from('cortes_historico')
-          .insert({ cliente_id, tipo: tipo || 'normal' });
-        if (error) throw error;
+          .insert({ cliente_id, tipo: usandoBonus ? 'admin' : (tipo || 'normal') });
+        if (insertErr) throw insertErr;
+        // Update client cuts
+        const { error: updateErr } = await supabase
+          .from('clientes')
+          .update({
+            cortes_restantes: clienteData.cortes_restantes - 1,
+            cortes_bonus: usandoBonus ? clienteData.cortes_bonus - 1 : (clienteData.cortes_bonus || 0)
+          })
+          .eq('id', cliente_id);
+        if (updateErr) throw updateErr;
         return jsonResponse({ success: true }, corsHeaders);
       }
 
