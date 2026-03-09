@@ -303,11 +303,11 @@ export const getHistoricoPagamentos = async (clienteId: string): Promise<Pagamen
 
 // Bulk fetch helpers for admin dashboard
 export const getAllPagamentos = async (clienteIds: string[]) => {
-  const result = await dbOp('get_all_pagamentos', { cliente_ids: clienteIds });
+  const result = await dbOp('get_all_pagamentos', { cliente_ids: clienteIds }, true);
   return result.data || [];
 };
 
 export const getAllCortes = async (clienteIds: string[]) => {
-  const result = await dbOp('get_all_cortes', { cliente_ids: clienteIds });
+  const result = await dbOp('get_all_cortes', { cliente_ids: clienteIds }, true);
   return result.data || [];
 };
