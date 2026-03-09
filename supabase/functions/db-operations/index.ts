@@ -78,19 +78,32 @@ serve(async (req) => {
     const { action, payload } = await req.json();
 
     // Define action categories
-    const writeActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'registrar_corte', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
+    const adminOnlyActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
     const adminReadActions = ['get_clientes', 'get_all_pagamentos', 'get_all_cortes'];
     const publicActions = ['get_cliente_by_credentials']; // Login action - no auth needed
+    const clientActions = ['registrar_corte']; // Client can register their own cuts
     const clientReadActions = ['get_cliente_by_id', 'get_cliente_by_cpf', 'get_historico_pagamentos', 'get_historico_cortes'];
 
-    // Admin token validation for write + admin-read actions
+    // Admin token validation for admin-only write + admin-read actions
     const adminToken = req.headers.get('x-admin-token');
     const clientSession = req.headers.get('x-client-session');
 
-    if (writeActions.includes(action) || adminReadActions.includes(action)) {
+    if (adminOnlyActions.includes(action) || adminReadActions.includes(action)) {
       if (!adminToken || !(await verifyAdminToken(adminToken))) {
         return new Response(
           JSON.stringify({ error: 'Token de admin inválido ou expirado' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Client actions require either admin token OR valid client session
+    if (clientActions.includes(action)) {
+      const isAdmin = adminToken && await verifyAdminToken(adminToken);
+      const hasClientSession = clientSession && payload?.cliente_id && verifyClientSession(clientSession, payload.cliente_id);
+      if (!isAdmin && !hasClientSession) {
+        return new Response(
+          JSON.stringify({ error: 'Autenticação necessária' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
