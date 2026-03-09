@@ -119,7 +119,7 @@ export const getClienteByCredentials = async (
 };
 
 export const getAllClientes = async (): Promise<Cliente[]> => {
-  const result = await dbOp('get_clientes');
+  const result = await dbOp('get_clientes', undefined, true);
   return result.data as Cliente[];
 };
 
