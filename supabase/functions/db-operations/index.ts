@@ -253,10 +253,33 @@ serve(async (req) => {
 
       case 'registrar_corte': {
         const { cliente_id, tipo } = payload;
-        const { error } = await supabase
+        // Get current client data
+        const { data: clienteData, error: fetchErr } = await supabase
+          .from('clientes')
+          .select('cortes_restantes, cortes_bonus')
+          .eq('id', cliente_id)
+          .single();
+        if (fetchErr || !clienteData) throw fetchErr || new Error('Cliente não encontrado');
+        if (clienteData.cortes_restantes <= 0) {
+          return new Response(
+            JSON.stringify({ error: 'Sem cortes disponíveis' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const usandoBonus = (clienteData.cortes_bonus || 0) > 0;
+        const { error: insertErr } = await supabase
           .from('cortes_historico')
-          .insert({ cliente_id, tipo: tipo || 'normal' });
-        if (error) throw error;
+          .insert({ cliente_id, tipo: usandoBonus ? 'admin' : (tipo || 'normal') });
+        if (insertErr) throw insertErr;
+        // Update client cuts
+        const { error: updateErr } = await supabase
+          .from('clientes')
+          .update({
+            cortes_restantes: clienteData.cortes_restantes - 1,
+            cortes_bonus: usandoBonus ? clienteData.cortes_bonus - 1 : (clienteData.cortes_bonus || 0)
+          })
+          .eq('id', cliente_id);
+        if (updateErr) throw updateErr;
         return jsonResponse({ success: true }, corsHeaders);
       }
 

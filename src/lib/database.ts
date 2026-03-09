@@ -161,20 +161,9 @@ export const deleteAllClientes = async (): Promise<void> => {
 };
 
 export const registrarCorte = async (clienteId: string): Promise<void> => {
-  const cliente = await getClienteById(clienteId);
-  if (!cliente) throw new Error('Cliente não encontrado');
-  if (cliente.cortes_restantes <= 0) throw new Error('Sem cortes disponíveis');
-
-  const usandoBonus = (cliente.cortes_bonus || 0) > 0;
-
+  // All logic is now handled server-side in the edge function
   await dbOp('registrar_corte', {
     cliente_id: clienteId,
-    tipo: usandoBonus ? 'admin' : 'normal'
-  }, true);
-
-  await updateCliente(clienteId, {
-    cortes_restantes: cliente.cortes_restantes - 1,
-    cortes_bonus: usandoBonus ? cliente.cortes_bonus - 1 : (cliente.cortes_bonus || 0)
   });
 };
 
