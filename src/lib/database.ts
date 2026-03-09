@@ -49,13 +49,8 @@ export const PLANOS = {
   }
 };
 
-export const ADMIN_CREDENTIALS = {
-  nome: 'Kelven',
-  sobrenome: 'Jarqueles',
-  pin: '08642'
-};
-
-export const CLIENT_CREATION_PIN = '97531';
+// Admin credentials and client creation PIN are now stored server-side as secrets
+// and verified via edge functions (verify-admin and verify-pin)
 
 // Funções auxiliares
 export const getClienteById = async (id: string): Promise<Cliente | undefined> => {
