@@ -54,6 +54,18 @@ serve(async (req) => {
         return jsonResponse({ data }, corsHeaders);
       }
 
+      case 'get_cliente_by_cpf': {
+        const { cpf } = payload;
+        const { data, error } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('cpf', cpf)
+          .eq('ativo', true)
+          .single();
+        if (error) return jsonResponse({ data: null }, corsHeaders);
+        return jsonResponse({ data }, corsHeaders);
+      }
+
       case 'get_cliente_by_id': {
         const { id } = payload;
         const { data, error } = await supabase
