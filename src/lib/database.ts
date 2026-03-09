@@ -84,12 +84,8 @@ export const getClienteById = async (id: string): Promise<Cliente | undefined> =
 };
 
 export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined> => {
-  // Use credentials lookup with just CPF
-  const { data, error } = await supabase.functions.invoke('db-operations', {
-    body: { action: 'get_cliente_by_credentials', payload: { nome: '%', sobrenome: '%', cpf } },
-  });
-  if (error || !data?.data) return undefined;
-  return data.data as Cliente;
+  const result = await dbOp('get_cliente_by_cpf', { cpf });
+  return result.data || undefined;
 };
 
 export const getClienteByCredentials = async (
