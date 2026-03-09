@@ -147,8 +147,18 @@ const AdminDashboard = () => {
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (pin !== CLIENT_CREATION_PIN) {
-      toast.error("PIN inválido — somente o dono pode criar clientes.");
+    // Verify PIN server-side
+    try {
+      const { data: pinData } = await supabase.functions.invoke('verify-pin', {
+        body: { pin }
+      });
+
+      if (!pinData?.valid) {
+        toast.error("PIN inválido — somente o dono pode criar clientes.");
+        return;
+      }
+    } catch {
+      toast.error("Erro ao verificar PIN.");
       return;
     }
 
