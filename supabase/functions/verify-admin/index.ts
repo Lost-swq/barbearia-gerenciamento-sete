@@ -23,12 +23,28 @@ serve(async (req) => {
       pin === adminPin;
 
     if (isValid) {
-      // Generate a simple token (hash of credentials + timestamp)
+      // Generate HMAC-signed token with expiry
+      const payload = {
+        sub: 'admin',
+        exp: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
+        iat: Date.now(),
+      };
+      const payloadB64 = btoa(JSON.stringify(payload));
+
       const encoder = new TextEncoder();
-      const data = encoder.encode(`${adminNome}${adminPin}${Date.now()}`);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const token = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(adminPin),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+      const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payloadB64));
+      const signatureHex = Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      const token = `${payloadB64}.${signatureHex}`;
 
       return new Response(
         JSON.stringify({ success: true, token }),

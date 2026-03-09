@@ -57,6 +57,11 @@ const getAdminToken = (): string | null => {
   return sessionStorage.getItem("adminAuthenticated");
 };
 
+// Helper to get client session token
+const getClientSession = (): string | null => {
+  return sessionStorage.getItem("clientSession");
+};
+
 // Helper to call db-operations edge function
 const dbOp = async (action: string, payload?: any, requiresAdmin = false) => {
   const headers: Record<string, string> = {};
@@ -65,6 +70,18 @@ const dbOp = async (action: string, payload?: any, requiresAdmin = false) => {
     if (token) {
       headers['x-admin-token'] = token;
     }
+  }
+
+  // For client read actions, send client session if available
+  const clientSession = getClientSession();
+  if (clientSession) {
+    headers['x-client-session'] = clientSession;
+  }
+
+  // Admin token also works for client reads
+  const adminToken = getAdminToken();
+  if (adminToken && !headers['x-admin-token']) {
+    headers['x-admin-token'] = adminToken;
   }
 
   const { data, error } = await supabase.functions.invoke('db-operations', {
@@ -94,6 +111,10 @@ export const getClienteByCredentials = async (
   cpf: string
 ): Promise<Cliente | undefined> => {
   const result = await dbOp('get_cliente_by_credentials', { nome, sobrenome, cpf });
+  // Store client session token if provided
+  if (result.sessionToken) {
+    sessionStorage.setItem("clientSession", result.sessionToken);
+  }
   return result.data || undefined;
 };
 
