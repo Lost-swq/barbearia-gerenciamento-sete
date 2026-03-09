@@ -317,12 +317,16 @@ export const registrarPagamento = async (
     novaDataPagamento = dataPagamentoEfetivo;
   }
 
-  // Atualiza o cliente com a nova data base
+  // Atualiza o cliente com a nova data base e reseta os cortes
+  const cortesDoPlano = PLANOS[cliente.plano as keyof typeof PLANOS]?.cortes ?? 3;
+
   const { error: updateError } = await supabase
     .from('clientes')
     .update({
-      data_pagamento: novaDataPagamento.toISOString().split('T')[0], // yyyy-mm-dd
-      data_ultimo_reset: novaDataPagamento.toISOString().split('T')[0] // Atualiza reset também
+      data_pagamento: novaDataPagamento.toISOString().split('T')[0],
+      data_ultimo_reset: novaDataPagamento.toISOString().split('T')[0],
+      cortes_restantes: cortesDoPlano,
+      cortes_bonus: 0
     })
     .eq('id', clienteId);
 
