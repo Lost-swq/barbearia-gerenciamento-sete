@@ -17,7 +17,6 @@ import {
   Cliente,
   PlanoType,
   PLANOS,
-  CLIENT_CREATION_PIN,
   registrarPagamento,
   calcularProximoReset,
   verificarEResetarCortes,
