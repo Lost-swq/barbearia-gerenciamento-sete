@@ -66,34 +66,21 @@ const AdminDashboard = () => {
       const clienteIds = data.map(c => c.id);
 
       if (clienteIds.length > 0) {
-        // Buscar todos os pagamentos de uma vez (1 query em vez de N)
-        const { data: todosPagamentos } = await supabase
-          .from('pagamentos_historico')
-          .select('*')
-          .in('cliente_id', clienteIds)
-          .order('data', { ascending: false });
+        const todosPagamentos = await getAllPagamentos(clienteIds);
+        const todosCortes = await getAllCortes(clienteIds);
 
-        // Buscar todos os cortes de uma vez (1 query em vez de N)
-        const { data: todosCortes } = await supabase
-          .from('cortes_historico')
-          .select('*')
-          .in('cliente_id', clienteIds)
-          .order('data', { ascending: false });
-
-        // Inicializar mapas
         clienteIds.forEach(id => {
           pagamentosMap[id] = [];
           cortesMap[id] = [];
         });
 
-        // Preencher com dados
-        todosPagamentos?.forEach(p => {
+        todosPagamentos?.forEach((p: any) => {
           if (pagamentosMap[p.cliente_id]) {
             pagamentosMap[p.cliente_id].push(p);
           }
         });
 
-        todosCortes?.forEach(c => {
+        todosCortes?.forEach((c: any) => {
           if (cortesMap[c.cliente_id]) {
             cortesMap[c.cliente_id].push(c);
           }
