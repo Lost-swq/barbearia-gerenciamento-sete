@@ -26,7 +26,7 @@ const ClientDashboard = () => {
     }
 
     try {
-      await verificarEResetarCortes();
+      // Skip verificarEResetarCortes - it requires admin access
       const clienteData = await getClienteById(clienteId);
 
       if (!clienteData) {
