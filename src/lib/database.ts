@@ -111,6 +111,10 @@ export const getClienteByCredentials = async (
   cpf: string
 ): Promise<Cliente | undefined> => {
   const result = await dbOp('get_cliente_by_credentials', { nome, sobrenome, cpf });
+  // Store client session token if provided
+  if (result.sessionToken) {
+    sessionStorage.setItem("clientSession", result.sessionToken);
+  }
   return result.data || undefined;
 };
 
