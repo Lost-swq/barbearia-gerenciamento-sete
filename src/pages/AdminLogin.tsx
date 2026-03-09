@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { ADMIN_CREDENTIALS } from "@/lib/database";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -25,21 +25,25 @@ const AdminLogin = () => {
 
     setLoading(true);
 
-    // Simular delay de validação
-    setTimeout(() => {
-      if (
-        nome.toLowerCase() === ADMIN_CREDENTIALS.nome.toLowerCase() &&
-        sobrenome.toLowerCase() === ADMIN_CREDENTIALS.sobrenome.toLowerCase() &&
-        pin === ADMIN_CREDENTIALS.pin
-      ) {
-        sessionStorage.setItem("adminAuthenticated", "true");
-        toast.success("Bem-vindo, Admin!");
-        navigate("/admin");
-      } else {
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-admin', {
+        body: { nome, sobrenome, pin }
+      });
+
+      if (error || !data?.success) {
         toast.error("Acesso negado. Use o login de administrador correto.");
+        setLoading(false);
+        return;
       }
+
+      sessionStorage.setItem("adminAuthenticated", data.token);
+      toast.success("Bem-vindo, Admin!");
+      navigate("/admin");
+    } catch (error) {
+      toast.error("Erro ao verificar credenciais.");
+    } finally {
       setLoading(false);
-    }, 500);
+    }
   };
 
   return (

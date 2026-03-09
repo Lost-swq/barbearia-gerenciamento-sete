@@ -49,37 +49,43 @@ export const PLANOS = {
   }
 };
 
-export const ADMIN_CREDENTIALS = {
-  nome: 'Kelven',
-  sobrenome: 'Jarqueles',
-  pin: '08642'
+// Admin credentials and client creation PIN are now stored server-side as secrets
+// and verified via edge functions (verify-admin and verify-pin)
+
+// Helper to get admin token from sessionStorage
+const getAdminToken = (): string | null => {
+  return sessionStorage.getItem("adminAuthenticated");
 };
 
-export const CLIENT_CREATION_PIN = '97531';
+// Helper to call db-operations edge function
+const dbOp = async (action: string, payload?: any, requiresAdmin = false) => {
+  const headers: Record<string, string> = {};
+  if (requiresAdmin) {
+    const token = getAdminToken();
+    if (token) {
+      headers['x-admin-token'] = token;
+    }
+  }
+
+  const { data, error } = await supabase.functions.invoke('db-operations', {
+    body: { action, payload },
+    headers,
+  });
+
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+};
 
 // Funções auxiliares
 export const getClienteById = async (id: string): Promise<Cliente | undefined> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('id', id)
-    .eq('ativo', true)
-    .single();
-
-  if (error) return undefined;
-  return data as Cliente;
+  const result = await dbOp('get_cliente_by_id', { id });
+  return result.data || undefined;
 };
 
 export const getClienteByCpf = async (cpf: string): Promise<Cliente | undefined> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('cpf', cpf)
-    .eq('ativo', true)
-    .single();
-
-  if (error) return undefined;
-  return data as Cliente;
+  const result = await dbOp('get_cliente_by_cpf', { cpf });
+  return result.data || undefined;
 };
 
 export const getClienteByCredentials = async (
@@ -87,28 +93,13 @@ export const getClienteByCredentials = async (
   sobrenome: string,
   cpf: string
 ): Promise<Cliente | undefined> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('cpf', cpf)
-    .eq('ativo', true)
-    .ilike('nome', nome)
-    .ilike('sobrenome', sobrenome)
-    .single();
-
-  if (error) return undefined;
-  return data as Cliente;
+  const result = await dbOp('get_cliente_by_credentials', { nome, sobrenome, cpf });
+  return result.data || undefined;
 };
 
 export const getAllClientes = async (): Promise<Cliente[]> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('ativo', true)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data as Cliente[];
+  const result = await dbOp('get_clientes');
+  return result.data as Cliente[];
 };
 
 export const addCliente = async (cliente: {
@@ -121,136 +112,59 @@ export const addCliente = async (cliente: {
   cortes_restantes?: number;
   cortes_bonus?: number;
 }): Promise<string> => {
-  const { data, error } = await supabase
-    .from('clientes')
-    .insert({
-      nome: cliente.nome,
-      sobrenome: cliente.sobrenome,
-      cpf: cliente.cpf,
-      plano: cliente.plano,
-      data_pagamento: cliente.data_pagamento,
-      data_ultimo_reset: cliente.data_pagamento, // Define o mesmo dia como último reset
-      pin_criacao: cliente.pin_criacao,
-      cortes_restantes: cliente.cortes_restantes ?? 3,
-      cortes_bonus: cliente.cortes_bonus ?? 0,
-      ativo: true
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data.id;
+  const result = await dbOp('insert_cliente', {
+    nome: cliente.nome,
+    sobrenome: cliente.sobrenome,
+    cpf: cliente.cpf,
+    plano: cliente.plano,
+    data_pagamento: cliente.data_pagamento,
+    data_ultimo_reset: cliente.data_pagamento,
+    pin_criacao: cliente.pin_criacao,
+    cortes_restantes: cliente.cortes_restantes ?? 3,
+    cortes_bonus: cliente.cortes_bonus ?? 0,
+    ativo: true
+  }, true);
+  return result.data.id;
 };
 
 export const updateCliente = async (id: string, updates: Partial<Cliente>): Promise<void> => {
-  const { error } = await supabase
-    .from('clientes')
-    .update(updates)
-    .eq('id', id);
-
-  if (error) throw error;
+  await dbOp('update_cliente', { id, updates }, true);
 };
 
 export const deleteCliente = async (id: string): Promise<void> => {
-  // Deletar histórico de cortes
-  await supabase
-    .from('cortes_historico')
-    .delete()
-    .eq('cliente_id', id);
-
-  // Deletar histórico de pagamentos
-  await supabase
-    .from('pagamentos_historico')
-    .delete()
-    .eq('cliente_id', id);
-
-  // Deletar o cliente
-  const { error } = await supabase
-    .from('clientes')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  await dbOp('delete_cliente', { id }, true);
 };
 
-// Excluir todos os clientes e seus dados
 export const deleteAllClientes = async (): Promise<void> => {
-  // Deletar todos os históricos de cortes
-  await supabase
-    .from('cortes_historico')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-
-  // Deletar todos os históricos de pagamentos
-  await supabase
-    .from('pagamentos_historico')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-
-  // Deletar todos os clientes
-  const { error } = await supabase
-    .from('clientes')
-    .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000'); // Deleta todos
-
-  if (error) throw error;
+  await dbOp('delete_all', {}, true);
 };
 
 export const registrarCorte = async (clienteId: string): Promise<void> => {
-  const { data: cliente, error: clienteError } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('id', clienteId)
-    .single();
-
-  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
-
-  if (cliente.cortes_restantes <= 0) {
-    throw new Error('Sem cortes disponíveis');
-  }
+  const cliente = await getClienteById(clienteId);
+  if (!cliente) throw new Error('Cliente não encontrado');
+  if (cliente.cortes_restantes <= 0) throw new Error('Sem cortes disponíveis');
 
   const usandoBonus = (cliente.cortes_bonus || 0) > 0;
 
-  // Inserir no histórico de cortes
-  const { error: corteError } = await supabase
-    .from('cortes_historico')
-    .insert({
-      cliente_id: clienteId,
-      tipo: usandoBonus ? 'admin' : 'normal'
-    });
+  await dbOp('registrar_corte', {
+    cliente_id: clienteId,
+    tipo: usandoBonus ? 'admin' : 'normal'
+  }, true);
 
-  if (corteError) throw corteError;
-
-  // Atualizar cortes restantes
-  const { error: updateError } = await supabase
-    .from('clientes')
-    .update({
-      cortes_restantes: cliente.cortes_restantes - 1,
-      cortes_bonus: usandoBonus ? cliente.cortes_bonus - 1 : (cliente.cortes_bonus || 0)
-    })
-    .eq('id', clienteId);
-
-  if (updateError) throw updateError;
+  await updateCliente(clienteId, {
+    cortes_restantes: cliente.cortes_restantes - 1,
+    cortes_bonus: usandoBonus ? cliente.cortes_bonus - 1 : (cliente.cortes_bonus || 0)
+  });
 };
 
 export const adicionarCorte = async (clienteId: string): Promise<void> => {
-  const { data: cliente, error: clienteError } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('id', clienteId)
-    .single();
+  const cliente = await getClienteById(clienteId);
+  if (!cliente) throw new Error('Cliente não encontrado');
 
-  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
-
-  const { error } = await supabase
-    .from('clientes')
-    .update({
-      cortes_restantes: cliente.cortes_restantes + 1,
-      cortes_bonus: (cliente.cortes_bonus || 0) + 1
-    })
-    .eq('id', clienteId);
-
-  if (error) throw error;
+  await updateCliente(clienteId, {
+    cortes_restantes: cliente.cortes_restantes + 1,
+    cortes_bonus: (cliente.cortes_bonus || 0) + 1
+  });
 };
 
 export const registrarPagamento = async (
@@ -258,49 +172,30 @@ export const registrarPagamento = async (
   valor: number,
   dataPagamento?: string
 ): Promise<void> => {
-  const { data: cliente, error: clienteError } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('id', clienteId)
-    .single();
-
-  if (clienteError || !cliente) throw new Error('Cliente não encontrado');
+  const cliente = await getClienteById(clienteId);
+  if (!cliente) throw new Error('Cliente não encontrado');
 
   const codigoConfirmacao = gerarCodigoConfirmacao();
 
-  // Inserir no histórico de pagamentos
   const pagamentoData: any = {
     cliente_id: clienteId,
     valor,
     confirmacao: codigoConfirmacao
   };
 
-  // Se foi fornecida uma data específica, usar ela
   if (dataPagamento) {
     pagamentoData.data = dataPagamento;
   }
 
-  const { error: pagamentoError } = await supabase
-    .from('pagamentos_historico')
-    .insert(pagamentoData);
-
-  if (pagamentoError) throw pagamentoError;
+  await dbOp('registrar_pagamento', pagamentoData, true);
 
   // Lógica de Pagamento Cumulativo
-  // Se o cliente paga antes do vencimento, estendemos a data base do pagamento em 1 mês
-  // Se paga depois (vencido), a data base vira a data atual (ou a data do pagamento informada)
-
   let novaDataPagamento: Date;
   const dataPagamentoEfetivo = dataPagamento ? new Date(dataPagamento) : new Date();
+  dataPagamentoEfetivo.setHours(12, 0, 0, 0);
 
-  // Normalizar datas para comparação (zerar horas)
-  dataPagamentoEfetivo.setHours(12, 0, 0, 0); // Meio-dia para evitar timezone issues
-
-  // Verifica se está dentro da validade
   if (podeFazerCheckin(cliente)) {
-    // Cliente adimplente: Soma 1 mês à data de referência antiga
     novaDataPagamento = new Date(cliente.data_pagamento);
-    // Adiciona "T12:00:00Z" se não tiver, para parse correto
     if (!cliente.data_pagamento.includes('T')) {
       novaDataPagamento = new Date(`${cliente.data_pagamento}T12:00:00Z`);
     }
@@ -308,29 +203,21 @@ export const registrarPagamento = async (
     const diaOriginal = novaDataPagamento.getUTCDate();
     novaDataPagamento.setUTCMonth(novaDataPagamento.getUTCMonth() + 1);
 
-    // Ajuste de overflow de mês (ex: 31/01 -> 03/03 -> 28/02)
     if (novaDataPagamento.getUTCDate() !== diaOriginal) {
       novaDataPagamento.setUTCDate(0);
     }
   } else {
-    // Cliente inadimplente ou primeira vez: Data base vira a data do pagamento atual
     novaDataPagamento = dataPagamentoEfetivo;
   }
 
-  // Atualiza o cliente com a nova data base e reseta os cortes
   const cortesDoPlano = PLANOS[cliente.plano as keyof typeof PLANOS]?.cortes ?? 3;
 
-  const { error: updateError } = await supabase
-    .from('clientes')
-    .update({
-      data_pagamento: novaDataPagamento.toISOString().split('T')[0],
-      data_ultimo_reset: novaDataPagamento.toISOString().split('T')[0],
-      cortes_restantes: cortesDoPlano,
-      cortes_bonus: 0
-    })
-    .eq('id', clienteId);
-
-  if (updateError) throw updateError;
+  await updateCliente(clienteId, {
+    data_pagamento: novaDataPagamento.toISOString().split('T')[0],
+    data_ultimo_reset: novaDataPagamento.toISOString().split('T')[0],
+    cortes_restantes: cortesDoPlano,
+    cortes_bonus: 0
+  });
 };
 
 const gerarCodigoConfirmacao = (): string => {
@@ -338,17 +225,14 @@ const gerarCodigoConfirmacao = (): string => {
 };
 
 export const calcularVencimento = (dataPagamento: string): Date => {
-  // Garante que a data seja tratada como UTC meio-dia para evitar problemas de fuso
-  // Se a string for apenas yyyy-mm-dd, adiciona T12:00:00Z
   const isoString = dataPagamento.includes('T') ? dataPagamento : `${dataPagamento}T12:00:00Z`;
   const vencimento = new Date(isoString);
 
   const diaOriginal = vencimento.getUTCDate();
   vencimento.setUTCMonth(vencimento.getUTCMonth() + 1);
 
-  // Tratamento de overflow (ex: 31 Jan -> 3 Mar -> Volta para 28/29 Fev)
   if (vencimento.getUTCDate() !== diaOriginal) {
-    vencimento.setUTCDate(0); // Volta para o último dia do mês anterior
+    vencimento.setUTCDate(0);
   }
 
   return vencimento;
@@ -356,20 +240,14 @@ export const calcularVencimento = (dataPagamento: string): Date => {
 
 export const podeFazerCheckin = (cliente: Cliente): boolean => {
   if (!cliente.ativo) return false;
-
-  // Se não tiver data de pagamento, bloqueia
   if (!cliente.data_pagamento) return false;
 
   const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0); // Considera início do dia
+  hoje.setHours(0, 0, 0, 0);
 
-  // Calcula vencimento baseado na data do último pagamento
   const vencimento = calcularVencimento(cliente.data_pagamento);
-
-  // Define o vencimento para o final do dia (tolerância até 23:59:59)
   vencimento.setUTCHours(23, 59, 59, 999);
 
-  // Permite check-in se hoje for anterior ou igual ao vencimento
   return hoje.getTime() <= vencimento.getTime();
 };
 
@@ -378,61 +256,48 @@ export const calcularProximoReset = (dataPagamento: string): Date => {
 };
 
 export const verificarEResetarCortes = async (): Promise<void> => {
-  const { data: clientes, error } = await supabase
-    .from('clientes')
-    .select('*')
-    .eq('ativo', true);
-
-  if (error || !clientes) return;
+  const clientes = await getAllClientes();
+  if (!clientes) return;
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
   for (const cliente of clientes) {
-    // Determina a data base para calcular o próximo reset
     const dataBase = cliente.data_ultimo_reset
       ? new Date(cliente.data_ultimo_reset)
       : new Date(cliente.data_pagamento);
 
-    // Calcula a data do próximo reset (31 dias após a data base)
     const proximoReset = new Date(dataBase);
     proximoReset.setDate(proximoReset.getDate() + 31);
     proximoReset.setHours(0, 0, 0, 0);
 
-    // Se hoje >= próximo reset, fazer o reset
     if (hoje >= proximoReset) {
-      await supabase
-        .from('clientes')
-        .update({
-          cortes_restantes: PLANOS[cliente.plano].cortes,
-          cortes_bonus: 0,
-          data_ultimo_reset: hoje.toISOString().split('T')[0]
-        })
-        .eq('id', cliente.id);
+      await updateCliente(cliente.id, {
+        cortes_restantes: PLANOS[cliente.plano].cortes,
+        cortes_bonus: 0,
+        data_ultimo_reset: hoje.toISOString().split('T')[0]
+      });
     }
   }
 };
 
-// Função para buscar histórico de cortes de um cliente
 export const getHistoricoCortes = async (clienteId: string): Promise<CorteHistorico[]> => {
-  const { data, error } = await supabase
-    .from('cortes_historico')
-    .select('*')
-    .eq('cliente_id', clienteId)
-    .order('data', { ascending: false });
-
-  if (error) throw error;
-  return data as CorteHistorico[];
+  const result = await dbOp('get_historico_cortes', { cliente_id: clienteId });
+  return result.data as CorteHistorico[];
 };
 
-// Função para buscar histórico de pagamentos de um cliente
 export const getHistoricoPagamentos = async (clienteId: string): Promise<PagamentoHistorico[]> => {
-  const { data, error } = await supabase
-    .from('pagamentos_historico')
-    .select('*')
-    .eq('cliente_id', clienteId)
-    .order('data', { ascending: false });
+  const result = await dbOp('get_historico_pagamentos', { cliente_id: clienteId });
+  return result.data as PagamentoHistorico[];
+};
 
-  if (error) throw error;
-  return data as PagamentoHistorico[];
+// Bulk fetch helpers for admin dashboard
+export const getAllPagamentos = async (clienteIds: string[]) => {
+  const result = await dbOp('get_all_pagamentos', { cliente_ids: clienteIds });
+  return result.data || [];
+};
+
+export const getAllCortes = async (clienteIds: string[]) => {
+  const result = await dbOp('get_all_cortes', { cliente_ids: clienteIds });
+  return result.data || [];
 };
