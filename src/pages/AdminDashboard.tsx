@@ -23,7 +23,9 @@ import {
   updateCliente,
   deleteCliente,
   adicionarCorte,
-  deleteAllClientes
+  deleteAllClientes,
+  getAllPagamentos,
+  getAllCortes
 } from "@/lib/database";
 
 const AdminDashboard = () => {
