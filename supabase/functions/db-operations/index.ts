@@ -3,8 +3,67 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token, x-client-session',
 };
+
+// Explicit columns to never expose pin_criacao
+const CLIENTE_COLUMNS = 'id, nome, sobrenome, cpf, plano, data_pagamento, cortes_restantes, cortes_bonus, ativo, data_ultimo_reset, created_at, updated_at';
+
+async function verifyAdminToken(token: string): Promise<boolean> {
+  const secret = Deno.env.get('ADMIN_PIN') || '';
+  if (!secret || !token) return false;
+
+  try {
+    const [payloadB64, signatureHex] = token.split('.');
+    if (!payloadB64 || !signatureHex) return false;
+
+    // Verify HMAC signature
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const signatureBytes = new Uint8Array(
+      signatureHex.match(/.{2}/g)!.map(b => parseInt(b, 16))
+    );
+
+    const isValid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      encoder.encode(payloadB64)
+    );
+
+    if (!isValid) return false;
+
+    // Check expiry
+    const payload = JSON.parse(atob(payloadB64));
+    if (Date.now() > payload.exp) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function verifyClientSession(sessionToken: string, clienteId: string): boolean {
+  // Client session token format: base64({cpf, cliente_id, exp}).signature
+  // For now, we validate that the token references the correct client
+  try {
+    const [payloadB64] = sessionToken.split('.');
+    if (!payloadB64) return false;
+    const payload = JSON.parse(atob(payloadB64));
+    if (Date.now() > payload.exp) return false;
+    if (payload.cliente_id !== clienteId) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,22 +77,40 @@ serve(async (req) => {
 
     const { action, payload } = await req.json();
 
-    // For write operations, verify admin token
-    const adminToken = req.headers.get('x-admin-token');
+    // Define action categories
     const writeActions = ['insert_cliente', 'update_cliente', 'delete_cliente', 'registrar_corte', 'adicionar_corte', 'registrar_pagamento', 'delete_all'];
-    
-    if (writeActions.includes(action) && !adminToken) {
-      return new Response(
-        JSON.stringify({ error: 'Token de admin necessário' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const adminReadActions = ['get_clientes', 'get_all_pagamentos', 'get_all_cortes'];
+    const clientReadActions = ['get_cliente_by_credentials', 'get_cliente_by_id', 'get_cliente_by_cpf', 'get_historico_pagamentos', 'get_historico_cortes'];
+
+    // Admin token validation for write + admin-read actions
+    const adminToken = req.headers.get('x-admin-token');
+    const clientSession = req.headers.get('x-client-session');
+
+    if (writeActions.includes(action) || adminReadActions.includes(action)) {
+      if (!adminToken || !(await verifyAdminToken(adminToken))) {
+        return new Response(
+          JSON.stringify({ error: 'Token de admin inválido ou expirado' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Client read actions require either admin token OR client session
+    if (clientReadActions.includes(action)) {
+      const isAdmin = adminToken && await verifyAdminToken(adminToken);
+      if (!isAdmin && !clientSession) {
+        return new Response(
+          JSON.stringify({ error: 'Autenticação necessária' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     switch (action) {
       case 'get_clientes': {
         const { data, error } = await supabase
           .from('clientes')
-          .select('*')
+          .select(CLIENTE_COLUMNS)
           .eq('ativo', true)
           .order('created_at', { ascending: false });
         if (error) throw error;
@@ -42,23 +119,32 @@ serve(async (req) => {
 
       case 'get_cliente_by_credentials': {
         const { nome, sobrenome, cpf } = payload;
+        if (!nome || !sobrenome || !cpf) {
+          return new Response(
+            JSON.stringify({ error: 'Campos obrigatórios faltando' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         const { data, error } = await supabase
           .from('clientes')
-          .select('*')
+          .select(CLIENTE_COLUMNS)
           .eq('cpf', cpf)
           .eq('ativo', true)
           .ilike('nome', nome)
           .ilike('sobrenome', sobrenome)
           .single();
         if (error) return jsonResponse({ data: null }, corsHeaders);
-        return jsonResponse({ data }, corsHeaders);
+
+        // Generate a client session token
+        const sessionToken = await generateClientSession(data.id, data.cpf);
+        return jsonResponse({ data, sessionToken }, corsHeaders);
       }
 
       case 'get_cliente_by_cpf': {
         const { cpf } = payload;
         const { data, error } = await supabase
           .from('clientes')
-          .select('*')
+          .select(CLIENTE_COLUMNS)
           .eq('cpf', cpf)
           .eq('ativo', true)
           .single();
@@ -70,7 +156,7 @@ serve(async (req) => {
         const { id } = payload;
         const { data, error } = await supabase
           .from('clientes')
-          .select('*')
+          .select(CLIENTE_COLUMNS)
           .eq('id', id)
           .eq('ativo', true)
           .single();
@@ -126,7 +212,7 @@ serve(async (req) => {
         const { data, error } = await supabase
           .from('clientes')
           .insert(payload)
-          .select()
+          .select(CLIENTE_COLUMNS)
           .single();
         if (error) throw error;
         return jsonResponse({ data }, corsHeaders);
@@ -192,11 +278,34 @@ serve(async (req) => {
     }
   } catch (error: any) {
     return new Response(
-      JSON.stringify({ error: error.message || 'Erro interno' }),
+      JSON.stringify({ error: 'Erro interno' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+async function generateClientSession(clienteId: string, cpf: string): Promise<string> {
+  const payload = {
+    cliente_id: clienteId,
+    cpf,
+    exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+  };
+  const payloadB64 = btoa(JSON.stringify(payload));
+
+  const secret = Deno.env.get('ADMIN_PIN') || '';
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payloadB64));
+  const signatureHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return `${payloadB64}.${signatureHex}`;
+}
 
 function jsonResponse(data: any, headers: Record<string, string>) {
   return new Response(
